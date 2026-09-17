@@ -18,9 +18,16 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Literal
+import json
+from typing import Any, Literal
 
-from ._constants import MARKER_PREFIX, MARKER_RE
+from ._constants import (
+    ERROR_CLASS,
+    MARKER_PREFIX,
+    MARKER_RE,
+    MAX_STAMPED_ITEMS,
+    SIGNATURE_STAMP_RE,
+)
 from ._models import RunSignature
 
 
@@ -51,6 +58,81 @@ Origin = Literal['new', 'comment']
 def render_notifier_marker(run_id: str, origin: Origin) -> str:
     """Render the marker the notifier stamps, telling the enricher what it touched."""
     return f'<!-- {MARKER_PREFIX}:run={run_id}:origin={origin} -->'
+
+
+def _capped(values: list[str]) -> list[str]:
+    """First MAX_STAMPED_ITEMS distinct non-empty values, in order of appearance."""
+    seen: dict[str, None] = {}
+    for value in values:
+        if value and value not in seen:
+            seen[value] = None
+        if len(seen) >= MAX_STAMPED_ITEMS:
+            break
+    return list(seen)
+
+
+def signature_fields(signature: RunSignature) -> dict[str, list[str]]:
+    """The parts of a signature the dedup ladder is written to match on.
+
+    Deliberately not the whole signature: `tail_excerpt` is dozens of log lines
+    and belongs nowhere near another issue's candidate entry, and the rungs in
+    the prompt name exactly these four things -- a test id, an error class, a
+    failed step, a job name.
+    """
+    tests: list[str] = []
+    errors: list[str] = []
+    steps: list[str] = []
+    jobs: list[str] = []
+    for job in signature.jobs:
+        jobs.append(job.job_name)
+        if job.failed_step:
+            steps.append(job.failed_step)
+        for failure in job.pytest_failures:
+            tests.append(failure.test)
+            # pytest truncates a long summary line, so the message is not
+            # reliable -- but the class name at the front of it survives, and
+            # the class is what the strong rung compares.
+            errors.extend(ERROR_CLASS.findall(failure.error))
+        tests.extend(job.go_failures)
+        if job.traceback_top_error:
+            errors.extend(ERROR_CLASS.findall(job.traceback_top_error))
+    return {
+        'tests': _capped(tests),
+        'errors': _capped(errors),
+        'steps': _capped(steps),
+        'jobs': _capped(jobs),
+    }
+
+
+def render_signature_stamp(run_id: str, signature: RunSignature) -> str:
+    """Render the hidden block that carries this run's signature fields.
+
+    Written into every artefact the enricher creates, so that when that
+    artefact comes back as somebody else's candidate the block can show what it
+    was actually about. Compact JSON: this ends up in an issue body.
+    """
+    payload: dict[str, Any] = {'run': str(run_id), **signature_fields(signature)}
+    body = json.dumps(payload, separators=(',', ':'))
+    return f'<!-- {MARKER_PREFIX}:signature {body} -->'
+
+
+def parse_signature_stamp(text: str) -> dict[str, Any] | None:
+    """The last signature stamp in `text`, or None if there is none to read.
+
+    The last, not the first: an issue the enricher has commented on several
+    times carries one stamp per occurrence, and the most recent is the one
+    describing what that issue looks like now. Anything unparseable is treated
+    as absent -- a candidate entry is not worth raising for.
+    """
+    found = None
+    for match in SIGNATURE_STAMP_RE.finditer(text or ''):
+        try:
+            parsed = json.loads(match['json'])
+        except ValueError:
+            continue
+        if isinstance(parsed, dict):
+            found = parsed
+    return found
 
 
 def render_enriched_marker(run_id: str, signature: RunSignature) -> str:

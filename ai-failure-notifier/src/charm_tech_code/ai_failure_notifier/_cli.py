@@ -28,7 +28,7 @@ from ._apply import apply_entry, plain_fallback_body, render_body
 from ._candidates import build_candidates_block
 from ._constants import DEFAULT_MODEL, MARKER_PREFIX
 from ._envelope import normalise_envelope, validate_envelope
-from ._markers import render_enriched_marker
+from ._markers import render_enriched_marker, render_signature_stamp
 from ._models import RunSignature
 from ._signatures import build_job_signature, build_run_signature
 
@@ -127,12 +127,12 @@ def _plain_fallback_entry(config: _RunConfig, origin_kind: str | None, origin_is
     if origin_kind == 'comment':
         return {
             'action': 'comment',
-            'body': plain_fallback_body(config.workflow_name, config.run_url),
+            'body': plain_fallback_body(config.workflow_name),
             'target_issue': origin_issue,
         }
     return {
         'action': 'new',
-        'body': plain_fallback_body(config.workflow_name, config.run_url),
+        'body': plain_fallback_body(config.workflow_name),
         'title': f"Scheduled workflow '{config.workflow_name}' failed",
         'labels': [],
         'issue_type': None,
@@ -140,14 +140,15 @@ def _plain_fallback_entry(config: _RunConfig, origin_kind: str | None, origin_is
 
 
 def _apply_plain_fallback(
-    config: _RunConfig, origin_kind: str | None, origin_issue: int, enriched_marker: str
+    config: _RunConfig, origin_kind: str | None, origin_issue: int, trailer: str
 ) -> None:
     """Apply the plain fallback entry against `origin_issue`."""
     apply_entry(
         config.repo,
         _plain_fallback_entry(config, origin_kind, origin_issue),
-        enriched_marker,
+        trailer,
         config.workflow_name,
+        config.run_url,
         default_target=origin_issue,
     )
 
@@ -198,9 +199,7 @@ def _fetch_envelope(
     envelope, dropped_fields = normalise_envelope(envelope)
     if dropped_fields:
         _summary.write_step_summary(
-            'Ignored fields that do not apply to the chosen action: '
-            + ', '.join(dropped_fields)
-            + '.'
+            'Ignored fields the applier does not act on: ' + ', '.join(dropped_fields) + '.'
         )
 
     errors = validate_envelope(envelope)
@@ -219,8 +218,16 @@ def _apply_envelope(
     origin_kind: str | None,
     origin_issue: int,
     enriched_marker: str,
+    trailer: str,
 ) -> None:
-    """Act on a validated LLM envelope: upgrade, comment, or open a new issue."""
+    """Act on a validated LLM envelope: upgrade, comment, or open a new issue.
+
+    `trailer` is the enriched marker plus this run's signature stamp, and goes
+    on every artefact that is *about* this failure. The two pointer notes below
+    get the bare `enriched_marker` instead: they are posted on an issue this
+    failure was decided not to belong to, and stamping that issue with this
+    signature would tell the next run's candidate block the opposite.
+    """
     if envelope['action'] == 'new' and origin_kind == 'new':
         # Upgrade the placeholder in place rather than creating a duplicate.
         available = _github.existing_labels(config.repo)
@@ -234,7 +241,7 @@ def _apply_envelope(
             '--title',
             envelope['title'],
             '--body',
-            render_body(envelope['body'], config.workflow_name, enriched_marker),
+            render_body(envelope['body'], config.workflow_name, config.run_url, trailer),
         ]
         for label in labels:
             edit_args += ['--add-label', label]
@@ -243,13 +250,14 @@ def _apply_envelope(
         apply_entry(
             config.repo,
             envelope,
-            enriched_marker,
+            trailer,
             config.workflow_name,
+            config.run_url,
             default_target=origin_issue,
         )
     elif envelope['action'] == 'comment':
         # LLM picked a different candidate than the notifier's coarse match.
-        apply_entry(config.repo, envelope, enriched_marker, config.workflow_name)
+        apply_entry(config.repo, envelope, trailer, config.workflow_name, config.run_url)
         if origin_kind == 'comment':
             _github.gh(
                 'issue',
@@ -259,12 +267,12 @@ def _apply_envelope(
                 config.repo,
                 '--body',
                 f'This looks like a distinct issue -- see #{envelope["target_issue"]}.\n\n'
-                f'{enriched_marker}',
+                f'Run: {config.run_url}\n\n{enriched_marker}',
             )
     else:
         # action == "new" but origin_kind == "comment": the coarse title
         # match landed on an unrelated older issue; this is genuinely new.
-        apply_entry(config.repo, envelope, enriched_marker, config.workflow_name)
+        apply_entry(config.repo, envelope, trailer, config.workflow_name, config.run_url)
         _github.gh(
             'issue',
             'comment',
@@ -273,11 +281,11 @@ def _apply_envelope(
             config.repo,
             '--body',
             f'This looks like a distinct issue from this one -- opened separately.\n\n'
-            f'{enriched_marker}',
+            f'Run: {config.run_url}\n\n{enriched_marker}',
         )
 
     for also_entry in envelope.get('also') or []:
-        apply_entry(config.repo, also_entry, enriched_marker, config.workflow_name)
+        apply_entry(config.repo, also_entry, trailer, config.workflow_name, config.run_url)
 
 
 def main() -> int:
@@ -292,20 +300,26 @@ def main() -> int:
 
     signature = _build_run_signature(config)
     enriched_marker = render_enriched_marker(config.run_id, signature)
+    # The marker says "this run was enriched here"; the stamp says what the
+    # failure was. Both are hidden, and both go on every artefact about this
+    # failure -- the stamp so that when this artefact turns up in a later run's
+    # candidate pool, the block can show its test ids and error classes instead
+    # of the one line of placeholder body it would otherwise be reduced to.
+    trailer = f'{enriched_marker}\n{render_signature_stamp(config.run_id, signature)}'
 
     if not config.api_key:
         _summary.write_step_summary(
             'No OPENROUTER_API_KEY configured -- using the plain fallback body.'
         )
-        _apply_plain_fallback(config, origin_kind, origin_issue, enriched_marker)
+        _apply_plain_fallback(config, origin_kind, origin_issue, trailer)
         return 0
 
     envelope = _fetch_envelope(config, origin_kind, origin_issue, signature)
     if envelope is None:
-        _apply_plain_fallback(config, origin_kind, origin_issue, enriched_marker)
+        _apply_plain_fallback(config, origin_kind, origin_issue, trailer)
         return 0
 
-    _apply_envelope(config, envelope, origin_kind, origin_issue, enriched_marker)
+    _apply_envelope(config, envelope, origin_kind, origin_issue, enriched_marker, trailer)
     return 0
 
 

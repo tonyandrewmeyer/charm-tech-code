@@ -25,6 +25,7 @@ what the dedup and schema logic actually exercise.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import datetime
 import email.message
 import io
@@ -352,6 +353,53 @@ class MarkerTests(unittest.TestCase):
         self.assertEqual(h1, h2)
         self.assertEqual(len(h1), 16)
 
+    def test_signature_fields_are_the_four_things_the_rungs_match_on(self):
+        fields = _markers.signature_fields(FIXTURE_SIGNATURE)
+        self.assertIn('tests/unit/test_charm.py::TestCharm::test_charm_ready', fields['tests'])
+        self.assertIn('AttributeError', fields['errors'])
+        self.assertIn('ImportError', fields['errors'])
+        self.assertIn("Run the charm's unit tests", fields['steps'])
+        self.assertIn('charm-tests (canonical/traefik-k8s-operator, .)', fields['jobs'])
+        # `tail_excerpt` is dozens of log lines and has no business in another
+        # issue's candidate entry.
+        self.assertEqual(set(fields), {'tests', 'errors', 'steps', 'jobs'})
+
+    def test_signature_fields_are_deduplicated_and_capped(self):
+        job = _models.JobSignature(
+            job_id=1,
+            job_name='j',
+            failed_step='s',
+            pytest_failures=[
+                _models.PytestFailure(
+                    kind='FAILED', test=f'tests/t.py::test_{i}', error='KeyError: x'
+                )
+                for i in range(20)
+            ],
+            go_failures=[],
+            traceback_top_error='KeyError: x',
+            tail_excerpt=[],
+        )
+        fields = _markers.signature_fields(dataclasses.replace(FIXTURE_SIGNATURE, jobs=[job]))
+        self.assertEqual(len(fields['tests']), _constants.MAX_STAMPED_ITEMS)
+        self.assertEqual(fields['errors'], ['KeyError'])
+        self.assertEqual(fields['jobs'], ['j'])
+
+    def test_signature_stamp_round_trips(self):
+        stamp = _markers.render_signature_stamp('28141163589', FIXTURE_SIGNATURE)
+        self.assertTrue(stamp.startswith('<!-- ai-failure-notifications:signature {'))
+        parsed = _markers.parse_signature_stamp(f'prose\n\n{stamp}\n\nmore prose')
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        self.assertEqual(parsed['run'], '28141163589')
+        self.assertEqual(parsed['tests'], _markers.signature_fields(FIXTURE_SIGNATURE)['tests'])
+
+    def test_a_signature_stamp_is_not_a_run_marker(self):
+        """Rung zero must not see the stamp. MARKER_RE is unchanged and this pins it."""
+        stamp = _markers.render_signature_stamp('28141163589', FIXTURE_SIGNATURE)
+        self.assertEqual(
+            _markers.find_run_markers([(1, stamp)], '28141163589'), (None, None, None)
+        )
+
     def test_no_marker_present_returns_all_none(self):
         enriched, origin_kind, origin_issue = _markers.find_run_markers(
             [(1, 'just a normal comment, no marker')], '123'
@@ -362,13 +410,158 @@ class MarkerTests(unittest.TestCase):
 
 
 class CandidateBlockTests(unittest.TestCase):
+    """What the model is shown about each candidate, pinned exactly.
+
+    Pinned rather than spot-checked with assertIn, because the whole finding of
+    canary-harness-2026-09-16.md is that this block had nothing in it: every
+    candidate reduced to a run URL, a `## Summary` heading or `(no body)`, so
+    the prompt's strong rung could not fire on any real issue. An assertIn
+    suite stays green through exactly that. If this test does not change when
+    the rendering changes, the rendering is not being reviewed.
+    """
+
     def test_open_candidate_rendered(self):
         block = _candidates.build_candidates_block(
             FIXTURE_CANDIDATES, [], datetime.datetime.now(datetime.timezone.utc)
         )
-        self.assertIn('#9010', block)
-        self.assertIn('Broad Charm Compatibility Tests', block)
-        self.assertNotIn('closed', block)
+        self.assertEqual(
+            block,
+            '- **#9010 — Broad Charm Compatibility Tests: 4 downstream charms failing, '
+            'independent causes** (open)\n'
+            '  > canonical/k8s-operator: bandit exit 1 (Medium: 24, High: 591). '
+            "canonical/seldon-core-operator: AttributeError: module 'ops.testing' has no "
+            "attribute '_TestingModelBackend'. "
+            'canonical/self-signed-certificates-operator: 5 collection errors. '
+            # Cut at MAX_EXCERPT_CHARS, mid-word: the bound is on characters,
+            # and a candidate excerpt is not prose anyone reads to the end.
+            'canonical/traefik-k8s-operator: ImportError: cannot import na',
+        )
+
+    def test_a_notifier_placeholder_candidate_shows_its_comment(self):
+        """The case the harness is about: an issue whose body says nothing.
+
+        #2633 on canonical/operator is exactly this shape -- one line of
+        placeholder body, and every word of diagnosis in the thread.
+        """
+        issue = _models.CandidateIssue.from_gh({
+            'number': 2633,
+            'title': "Scheduled workflow 'Example Charm Integration Tests' failed",
+            'body': (
+                "Scheduled workflow 'Example Charm Integration Tests' failed: "
+                'https://github.com/canonical/operator/actions/runs/28882829315'
+            ),
+            'closedAt': None,
+            'comments': [
+                {'body': 'Timeouts and a store failure. Trying a re-run.'},
+                {'body': '`test_deploy_cos` times out after 10 minutes.'},
+            ],
+        })
+        block = _candidates.build_candidates_block(
+            [issue], [], datetime.datetime.now(datetime.timezone.utc)
+        )
+        self.assertEqual(
+            block,
+            "- **#2633 — Scheduled workflow 'Example Charm Integration Tests' failed** (open)\n"
+            "  > Scheduled workflow 'Example Charm Integration Tests' failed: "
+            'https://github.com/canonical/operator/actions/runs/28882829315\n'
+            '  > earlier comment: Timeouts and a store failure. Trying a re-run.\n'
+            '  > most recent comment: `test_deploy_cos` times out after 10 minutes.',
+        )
+
+    def test_an_issue_this_tool_enriched_shows_its_failure_signature(self):
+        stamp = _markers.render_signature_stamp('28882829315', FIXTURE_SIGNATURE)
+        issue = _models.CandidateIssue.from_gh({
+            'number': 31,
+            'title': 'Broad Charm Compatibility Tests: downstream charms failing',
+            'body': f'## Summary\n\nFour downstream charms failed.\n\n{stamp}',
+            'closedAt': None,
+        })
+        block = _candidates.build_candidates_block(
+            [issue], [], datetime.datetime.now(datetime.timezone.utc)
+        )
+        # The body excerpt skips the heading the shipped prompt always emits,
+        # so it is the summary sentence rather than the word "Summary".
+        self.assertIn('  > Four downstream charms failed.', block)
+        self.assertIn('  > failure signature (run 28882829315): tests ', block)
+        self.assertIn('tests/unit/test_charm.py::TestCharm::test_charm_ready', block)
+        self.assertIn('AttributeError', block)
+        self.assertIn("steps Run the charm's unit tests", block)
+        self.assertNotIn('<!--', block)
+
+    def test_an_issue_nobody_has_enriched_gets_no_signature_line(self):
+        """The common case on a tracker this tool has not run against yet.
+
+        Stated as its own test because a fix that only works on issues this
+        tool has already touched would be no fix at all for a fresh repo, and
+        this is the assertion that says which half of the change is carrying
+        the weight there.
+        """
+        issue = _models.CandidateIssue.from_gh({
+            'number': 2641,
+            'title': 'Integration tests fail against Juju 4.1/edge',
+            'body': "Scheduled workflow 'ops Integration Tests' failed: https://x/runs/1",
+            'closedAt': None,
+        })
+        block = _candidates.build_candidates_block(
+            [issue], [], datetime.datetime.now(datetime.timezone.utc)
+        )
+        self.assertNotIn('failure signature', block)
+        self.assertNotIn('most recent comment', block)
+        self.assertEqual(
+            block,
+            '- **#2641 — Integration tests fail against Juju 4.1/edge** (open)\n'
+            "  > Scheduled workflow 'ops Integration Tests' failed: https://x/runs/1",
+        )
+
+    def test_a_stamp_in_a_comment_is_read_and_the_latest_one_wins(self):
+        """An issue the enricher has commented on carries its stamp there, not in the body."""
+        first = _markers.render_signature_stamp('111', FIXTURE_SIGNATURE)
+        later = _markers.render_signature_stamp(
+            '222',
+            dataclasses.replace(
+                FIXTURE_SIGNATURE,
+                jobs=[
+                    _models.JobSignature(
+                        job_id=1,
+                        job_name='k8s-5-observe',
+                        failed_step='Run integration tests',
+                        pytest_failures=[
+                            _models.PytestFailure(
+                                kind='FAILED',
+                                test='tests/integration/test_charm.py::test_deploy_cos',
+                                error='TimeoutError: timed out',
+                            )
+                        ],
+                        go_failures=[],
+                        traceback_top_error='TimeoutError: timed out',
+                        tail_excerpt=[],
+                    )
+                ],
+            ),
+        )
+        issue = _models.CandidateIssue.from_gh({
+            'number': 31,
+            'title': 'COS deploy times out',
+            'body': f'Some prose.\n\n{first}',
+            'closedAt': None,
+            'comments': [{'body': f'Another occurrence.\n\n{later}'}],
+        })
+        line = _candidates.render_signature_line(issue)
+        self.assertIsNotNone(line)
+        assert line is not None
+        self.assertTrue(line.startswith('failure signature (run 222): '))
+        self.assertIn('test_deploy_cos', line)
+        self.assertIn('errors TimeoutError', line)
+        self.assertNotIn('test_charm_ready', line)
+
+    def test_an_unparseable_stamp_is_treated_as_absent(self):
+        issue = _models.CandidateIssue(
+            number=5,
+            title='t',
+            body='<!-- ai-failure-notifications:signature {not json} -->',
+            closed_at=None,
+        )
+        self.assertIsNone(_candidates.render_signature_line(issue))
 
     def test_empty_candidates_block(self):
         block = _candidates.build_candidates_block(
@@ -668,6 +861,66 @@ class MainFlowTests(unittest.TestCase):
         edit_calls = [c for c in gh_calls.call_args_list if c.args[:2] == ('issue', 'edit')]
         self.assertEqual(len(edit_calls), 1)
         self.assertEqual(edit_calls[0].args[2], '4242')
+        # The placeholder this edits over contained exactly one thing -- the run
+        # link -- so enriching it used to delete the only pointer to the job
+        # that failed (canary-harness-2026-09-16.md §4).
+        args = edit_calls[0].args
+        body = args[args.index('--body') + 1]
+        self.assertIn(f'Run: {self.env["RUN_URL"]}', body)
+        self.assertIn('<!-- ai-failure-notifications:run=28141163589:sig=', body)
+        self.assertIn('<!-- ai-failure-notifications:signature {', body)
+
+    def test_the_pointer_note_links_the_run_but_carries_no_signature_stamp(self):
+        """A "this belongs elsewhere" note must not stamp this failure on that issue.
+
+        The stamp is what a later run's candidate block reads to decide what an
+        issue is about, so stamping the issue this failure was decided NOT to
+        belong to would teach the next run the opposite of the decision this
+        one made. The run link still belongs there: canary-harness-2026-09-16.md
+        §5 found a reader of that issue got one sentence and nothing to follow.
+        """
+        gh_calls = mock.Mock(
+            return_value=mock.Mock(returncode=0, stdout='https://x/issues/9', stderr='')
+        )
+        patches = self._patch_common(locate_return=(None, 'comment', 4242), gh_calls=gh_calls)
+        envelope = {
+            'action': 'new',
+            'title': 'x',
+            'body': 'y',
+            'labels': [],
+            'issue_type': None,
+            'dedup_reason': 'd',
+            'confidence': 'medium',
+        }
+        with (
+            mock.patch.dict('os.environ', self.env, clear=True),
+            mock.patch.object(_openrouter, 'call_openrouter', return_value=envelope),
+            mock.patch.object(_github, 'existing_issue_types', return_value=set()),
+            contextlib.ExitStack() as stack,
+        ):
+            for p in patches:
+                stack.enter_context(p)
+            rc = _cli.main()
+        self.assertEqual(rc, 0)
+        pointer = [
+            c
+            for c in gh_calls.call_args_list
+            if c.args[:2] == ('issue', 'comment') and c.args[2] == '4242'
+        ]
+        self.assertEqual(len(pointer), 1)
+        args = pointer[0].args
+        body = args[args.index('--body') + 1]
+        self.assertIn('opened separately', body)
+        self.assertIn(f'Run: {self.env["RUN_URL"]}', body)
+        self.assertNotIn('ai-failure-notifications:signature', body)
+        # The new issue itself is about this failure, so it does get the stamp.
+        created = [c for c in gh_calls.call_args_list if c.args[:2] == ('issue', 'create')]
+        self.assertEqual(len(created), 1)
+        created_args = created[0].args
+        self.assertIn(
+            'ai-failure-notifications:signature',
+            created_args[created_args.index('--body') + 1],
+        )
 
     def test_invalid_llm_response_falls_back_to_plain_comment(self):
         gh_calls = mock.Mock(return_value=mock.Mock(returncode=0, stdout='', stderr=''))
@@ -729,6 +982,67 @@ class GhCallShapeTests(unittest.TestCase):
             self.assertEqual(args[args.index('--search') + 1], '"Example Charm Tests"')
             states.append(args[args.index('--state') + 1])
         self.assertEqual(states, ['open', 'closed'])
+
+    def test_search_candidates_asks_for_the_comments_field(self):
+        """Without `comments` the candidate block has nothing in it to match on.
+
+        A notifier-era issue's body is one line reading "Scheduled workflow 'X'
+        failed: <url>"; everything anybody knows about it is in the thread. Not
+        asking `gh` for it is how canary-harness-2026-09-16.md's §4 finding
+        happened, so the field list is pinned here rather than left to an
+        assertIn somewhere downstream.
+        """
+        gh_calls = self._capture('[]')
+        with mock.patch.object(_github, 'gh', side_effect=gh_calls):
+            _github.search_candidates('example/repo', 'Example Charm Tests')
+        for call in gh_calls.call_args_list:
+            args = call.args
+            self.assertEqual(
+                args[args.index('--json') + 1], 'number,title,body,createdAt,closedAt,comments'
+            )
+
+    def test_search_candidates_retries_without_comments_on_an_older_gh(self):
+        """An old `gh` must lose the comments, not the whole candidate pool.
+
+        _cli degrades a failed search to "no candidates at all", so letting the
+        unknown field propagate would make an old `gh` strictly worse than it
+        was before comments were ever asked for.
+        """
+        responses = [
+            mock.Mock(returncode=1, stdout='', stderr='unknown JSON field: "comments"'),
+            mock.Mock(returncode=0, stdout='[]', stderr=''),
+            mock.Mock(returncode=1, stdout='', stderr='unknown JSON field: "comments"'),
+            mock.Mock(returncode=0, stdout='[]', stderr=''),
+        ]
+        gh_calls = mock.Mock(side_effect=responses)
+        with (
+            mock.patch.object(_github, 'gh', side_effect=gh_calls),
+            mock.patch.object(_summary, 'write_step_summary') as summary,
+        ):
+            opens, closed = _github.search_candidates('example/repo', 'Example Charm Tests')
+        self.assertEqual((opens, closed), ([], []))
+        fields = [c.args[c.args.index('--json') + 1] for c in gh_calls.call_args_list]
+        self.assertEqual(
+            fields,
+            [
+                'number,title,body,createdAt,closedAt,comments',
+                'number,title,body,createdAt,closedAt',
+                'number,title,body,createdAt,closedAt,comments',
+                'number,title,body,createdAt,closedAt',
+            ],
+        )
+        self.assertIn('comments', summary.call_args.args[0])
+
+    def test_search_candidates_raises_on_a_failure_that_is_not_the_field(self):
+        """A 404 or a rate limit is not something to retry with fewer fields."""
+        gh_calls = mock.Mock(
+            return_value=mock.Mock(returncode=1, stdout='', stderr='gh: Not Found (HTTP 404)')
+        )
+        with mock.patch.object(_github, 'gh', side_effect=gh_calls):
+            with self.assertRaises(RuntimeError) as caught:
+                _github.search_candidates('example/repo', 'Example Charm Tests')
+        self.assertIn('404', str(caught.exception))
+        gh_calls.assert_called_once()
 
     def test_fetch_job_log_uses_the_rest_logs_endpoint(self):
         gh_calls = self._capture('2026-07-21T16:17:04Z some log line\n')
@@ -983,6 +1297,166 @@ class NormalisationTests(unittest.TestCase):
         self.assertEqual(cleaned['also'][0]['target_issue'], 1)
         self.assertEqual(_envelope.validate_envelope(cleaned), [])
 
+    def test_an_unknown_property_is_stripped_rather_than_discarding_the_envelope(self):
+        """Cell D1 of the 2026-09-16 harness, in one test.
+
+        The model returned an extra `html_url`; `additionalProperties: false`
+        rejected the whole envelope; `_cli` fell back to the plain body and a
+        real title, body and dedup decision were thrown away. An unknown
+        property is one `apply_entry` never reads, so removing it cannot change
+        what gets posted -- and rejecting the envelope demonstrably does.
+        """
+        envelope = {
+            'action': 'comment',
+            'target_issue': 9010,
+            'body': 'Another occurrence.',
+            'dedup_reason': 'same tests',
+            'confidence': 'high',
+            'html_url': 'https://github.com/example/repo/issues/9010',
+        }
+        cleaned, notes = _envelope.normalise_envelope(envelope)
+        self.assertNotIn('html_url', cleaned)
+        self.assertIn('envelope: html_url (not in the schema)', notes)
+        self.assertEqual(_envelope.validate_envelope(cleaned), [])
+        self.assertEqual(cleaned['body'], 'Another occurrence.')
+
+    def test_an_unknown_property_in_an_also_entry_is_stripped_too(self):
+        envelope = {
+            'action': 'new',
+            'title': 't',
+            'labels': [],
+            'issue_type': None,
+            'body': 'b',
+            'dedup_reason': 'r',
+            'confidence': 'low',
+            'also': [
+                {
+                    'action': 'comment',
+                    'target_issue': 7,
+                    'body': 'b',
+                    'dedup_reason': 'r',
+                    'confidence': 'medium',
+                    'url': 'https://example.invalid/7',
+                }
+            ],
+        }
+        cleaned, notes = _envelope.normalise_envelope(envelope)
+        self.assertNotIn('url', cleaned['also'][0])
+        self.assertIn('envelope.also[0]: url (not in the schema)', notes)
+        self.assertEqual(_envelope.validate_envelope(cleaned), [])
+
+    def test_stripping_an_unknown_property_does_not_invent_a_target(self):
+        """The repair is a strip, not a guess.
+
+        A model that put its target in `issue` rather than `target_issue` has
+        not told us what to comment on in a way we are entitled to act on, so
+        the envelope must still be rejected rather than quietly retargeted.
+        """
+        envelope = {
+            'action': 'comment',
+            'issue': 9010,
+            'body': 'b',
+            'dedup_reason': 'r',
+            'confidence': 'high',
+        }
+        cleaned, notes = _envelope.normalise_envelope(envelope)
+        self.assertNotIn('issue', cleaned)
+        self.assertNotIn('target_issue', cleaned)
+        self.assertIn('envelope: issue (not in the schema)', notes)
+        self.assertNotEqual(_envelope.validate_envelope(cleaned), [])
+
+    def test_a_body_written_under_comment_is_read_from_there(self):
+        """Cell B4 of the 2026-09-17 round: right text, wrong key.
+
+        `strict` is not enforced by the provider, so the model can and does
+        return a key the schema does not declare. Stripping `comment` as
+        unknown without first reading it would throw away the one thing the
+        envelope exists to carry.
+        """
+        envelope = {
+            'action': 'comment',
+            'target_issue': 2633,
+            'comment': 'Same `test_deploy_cos` timeout, plus a KeyError in test_loki_data.',
+            'dedup_reason': 'matching test and step',
+            'confidence': 'medium',
+        }
+        cleaned, notes = _envelope.normalise_envelope(envelope)
+        self.assertEqual(
+            cleaned['body'], 'Same `test_deploy_cos` timeout, plus a KeyError in test_loki_data.'
+        )
+        self.assertNotIn('comment', cleaned)
+        self.assertIn('envelope: read the body from "comment"', notes)
+        self.assertEqual(_envelope.validate_envelope(cleaned), [])
+
+    def test_a_real_body_is_never_overwritten_by_an_alias(self):
+        envelope = {
+            'action': 'comment',
+            'target_issue': 7,
+            'body': 'the real body',
+            'comment': 'something else',
+            'dedup_reason': 'r',
+            'confidence': 'high',
+        }
+        cleaned, _ = _envelope.normalise_envelope(envelope)
+        self.assertEqual(cleaned['body'], 'the real body')
+
+    def test_a_comment_with_no_body_falls_back_to_the_dedup_reason(self):
+        """Cells B5 and B6: a correct target and a real reason, and no body.
+
+        The alternative is discarding the target and the reason together and
+        posting the generic placeholder on a different issue.
+        """
+        envelope = {
+            'action': 'comment',
+            'target_issue': 2641,
+            'dedup_reason': "All four jobs fail during bootstrap with the same 'unknown error'.",
+            'confidence': 'high',
+        }
+        cleaned, notes = _envelope.normalise_envelope(envelope)
+        self.assertEqual(
+            cleaned['body'], "All four jobs fail during bootstrap with the same 'unknown error'."
+        )
+        self.assertIn('envelope: no body supplied; commented with dedup_reason instead', notes)
+        self.assertEqual(_envelope.validate_envelope(cleaned), [])
+
+    def test_a_null_body_on_a_comment_is_repaired_too(self):
+        """Cell B2 returned `"body": null` rather than omitting it."""
+        envelope = {
+            'action': 'comment',
+            'target_issue': 2633,
+            'body': None,
+            'dedup_reason': 'Same test_deploy_cos timeout as in #2633',
+            'confidence': 'high',
+        }
+        cleaned, _ = _envelope.normalise_envelope(envelope)
+        self.assertEqual(cleaned['body'], 'Same test_deploy_cos timeout as in #2633')
+        self.assertEqual(_envelope.validate_envelope(cleaned), [])
+
+    def test_a_new_issue_with_no_body_is_still_rejected(self):
+        """The dedup_reason fallback is for comments only.
+
+        A new issue is a bigger artefact than one sentence of reasoning, and
+        there is still a notifier placeholder to fall back to, so this one is
+        left to fail rather than padded out.
+        """
+        envelope = {
+            'action': 'new',
+            'title': 't',
+            'labels': [],
+            'issue_type': None,
+            'dedup_reason': 'nothing matched',
+            'confidence': 'low',
+        }
+        cleaned, _ = _envelope.normalise_envelope(envelope)
+        self.assertNotIn('body', cleaned)
+        self.assertNotEqual(_envelope.validate_envelope(cleaned), [])
+
+    def test_a_comment_with_neither_body_nor_reason_is_still_rejected(self):
+        envelope = {'action': 'comment', 'target_issue': 7, 'confidence': 'high'}
+        cleaned, _ = _envelope.normalise_envelope(envelope)
+        self.assertNotIn('body', cleaned)
+        self.assertNotEqual(_envelope.validate_envelope(cleaned), [])
+
     def test_nothing_dropped_leaves_the_envelope_alone(self):
         cleaned, dropped = _envelope.normalise_envelope(FIXTURE_ENVELOPE)
         self.assertEqual(dropped, [])
@@ -1056,20 +1530,33 @@ class BodyFooterTests(unittest.TestCase):
     the model happening to leave the workflow name in the title.
     """
 
-    def test_render_body_has_footer_and_marker(self):
-        body = _apply.render_body('Some detail.', 'Example Charm Tests', '<!-- m -->')
-        self.assertEqual(body, 'Some detail.\n\nWorkflow: Example Charm Tests\n\n<!-- m -->')
+    def test_render_body_has_footer_run_link_and_marker(self):
+        body = _apply.render_body(
+            'Some detail.', 'Example Charm Tests', 'https://x/actions/runs/7', '<!-- m -->'
+        )
+        self.assertEqual(
+            body,
+            'Some detail.\n\nWorkflow: Example Charm Tests\n'
+            'Run: https://x/actions/runs/7\n\n<!-- m -->',
+        )
 
-    def test_applied_comment_body_has_the_footer(self):
+    def test_applied_comment_body_has_the_footer_and_the_run_link(self):
         gh_calls = mock.Mock(return_value=mock.Mock(returncode=0, stdout='', stderr=''))
         entry: dict[str, Any] = {'action': 'comment', 'body': 'Another occurrence.'}
         with mock.patch.object(_github, 'gh', side_effect=gh_calls):
             _apply.apply_entry(
-                'example/repo', entry, '<!-- m -->', 'ops Smoke Tests', default_target=7
+                'example/repo',
+                entry,
+                '<!-- m -->',
+                'ops Smoke Tests',
+                'https://x/actions/runs/7',
+                default_target=7,
             )
         args = gh_calls.call_args.args
         self.assertEqual(args[:3], ('issue', 'comment', '7'))
-        self.assertIn('Workflow: ops Smoke Tests', args[args.index('--body') + 1])
+        body = args[args.index('--body') + 1]
+        self.assertIn('Workflow: ops Smoke Tests', body)
+        self.assertIn('Run: https://x/actions/runs/7', body)
 
     def test_a_missing_issue_type_creates_one_issue_and_not_two(self):
         """The type is resolved before the create, so there is nothing to retry.
@@ -1093,7 +1580,9 @@ class BodyFooterTests(unittest.TestCase):
             mock.patch.object(_github, 'existing_issue_types', return_value=set()),
             mock.patch.object(_summary, 'write_step_summary') as summary,
         ):
-            _apply.apply_entry('example/repo', entry, '<!-- m -->', 'ops Smoke Tests')
+            _apply.apply_entry(
+                'example/repo', entry, '<!-- m -->', 'ops Smoke Tests', 'https://x/runs/7'
+            )
         gh_calls.assert_called_once()
         self.assertNotIn('--type', gh_calls.call_args.args)
         self.assertIn('bug', summary.call_args.args[0])
@@ -1114,7 +1603,9 @@ class BodyFooterTests(unittest.TestCase):
             mock.patch.object(_github, 'existing_labels', return_value=set()),
             mock.patch.object(_github, 'existing_issue_types', return_value={'Bug', 'Task'}),
         ):
-            _apply.apply_entry('example/repo', entry, '<!-- m -->', 'ops Smoke Tests')
+            _apply.apply_entry(
+                'example/repo', entry, '<!-- m -->', 'ops Smoke Tests', 'https://x/runs/7'
+            )
         gh_calls.assert_called_once()
         args = gh_calls.call_args.args
         self.assertEqual(args[args.index('--type') + 1], 'Bug')
@@ -1135,7 +1626,9 @@ class BodyFooterTests(unittest.TestCase):
             mock.patch.object(_github, 'existing_labels', return_value=set()),
             mock.patch.object(_github, 'existing_issue_types') as types,
         ):
-            _apply.apply_entry('example/repo', entry, '<!-- m -->', 'ops Smoke Tests')
+            _apply.apply_entry(
+                'example/repo', entry, '<!-- m -->', 'ops Smoke Tests', 'https://x/runs/7'
+            )
         types.assert_not_called()
 
     def test_applied_new_issue_body_has_the_footer(self):
@@ -1153,7 +1646,9 @@ class BodyFooterTests(unittest.TestCase):
             mock.patch.object(_github, 'gh', side_effect=gh_calls),
             mock.patch.object(_github, 'existing_labels', return_value=set()),
         ):
-            _apply.apply_entry('example/repo', entry, '<!-- m -->', 'ops Smoke Tests')
+            _apply.apply_entry(
+                'example/repo', entry, '<!-- m -->', 'ops Smoke Tests', 'https://x/runs/7'
+            )
         args = gh_calls.call_args.args
         self.assertIn('Workflow: ops Smoke Tests', args[args.index('--body') + 1])
 
