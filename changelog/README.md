@@ -37,8 +37,7 @@ Release notes are the same content with `###` headings and full pull-request URL
 
 Most of the rules are visible there:
 
-* **A contributor from outside the maintaining team is credited; a maintainer is not.** A changelog whose every line ends in the same three handles has stopped carrying information. Pass the team to `--team`, comma-separated, as emails and/or handles. **An empty team credits everyone**, which is the right way for this to fail: over-crediting is visible in the draft release and takes one edit, while crediting nobody is invisible until a contributor notices.
-* **"Outside the team" is not "outside Canonical".** Someone from another Canonical team has every bit as much claim to the credit.
+* **A contributor from outside the maintaining team is credited; a maintainer is not.** Pass the team to `--team`, comma-separated, as emails and/or handles. **An empty team credits everyone**: over-crediting is visible in the draft release and takes one edit, while crediting nobody is invisible until a contributor notices.
 * **A handle is only sometimes recoverable.** `46688206+ducky-debugger@users.noreply.github.com` gives `@ducky-debugger`, GitHub's default for an account with a private email; where the log has no handle, the person is credited by name.
 * **`chore` is dropped on purpose.** Dependency bumps, charm pins and the release's own version bump are not what a reader came for, and `git log` still has them.
 * **The headings, their order and the commit-type map are fixed.** The format is common across our repositories and the type set is enforced by a shared PR-title check, so there is nothing for an adopting repository to supply.
