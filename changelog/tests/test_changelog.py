@@ -309,24 +309,24 @@ class TestWholeRelease:
 
 ## Fixes
 
-* Stop the framework mistaking two notices for twins by @ducky-debugger (https://github.com/canonical/operator/pull/2684)
-* Don't put words in an unknown status's mouth (https://github.com/canonical/operator/pull/2700)
+* Stop the framework mistaking two notices for twins by @ducky-debugger ([#2684](https://github.com/canonical/operator/pull/2684))
+* Don't put words in an unknown status's mouth ([#2700](https://github.com/canonical/operator/pull/2700))
 
 ## Documentation
 
-* Give each warning a stable :name: anchor to cling to (https://github.com/canonical/operator/pull/2524)
-* Reword the sentences the spell-checker keeps side-eyeing (https://github.com/canonical/operator/pull/2695)
-* Stop dressing cross-references up as quotations (https://github.com/canonical/operator/pull/2666)
-* Make the sample test do something other than pass (https://github.com/canonical/operator/pull/2664)
-* Replace `requests` with `urllib` in the tutorial tests (https://github.com/canonical/operator/pull/2687)
-* Point people at spread without the charmcraft detour (https://github.com/canonical/operator/pull/2706)
-* Move the integration-testing advice into a howto of its own (https://github.com/canonical/operator/pull/2662)
+* Give each warning a stable :name: anchor to cling to ([#2524](https://github.com/canonical/operator/pull/2524))
+* Reword the sentences the spell-checker keeps side-eyeing ([#2695](https://github.com/canonical/operator/pull/2695))
+* Stop dressing cross-references up as quotations ([#2666](https://github.com/canonical/operator/pull/2666))
+* Make the sample test do something other than pass ([#2664](https://github.com/canonical/operator/pull/2664))
+* Replace `requests` with `urllib` in the tutorial tests ([#2687](https://github.com/canonical/operator/pull/2687))
+* Point people at spread without the charmcraft detour ([#2706](https://github.com/canonical/operator/pull/2706))
+* Move the integration-testing advice into a howto of its own ([#2662](https://github.com/canonical/operator/pull/2662))
 
 ## CI
 
-* Point the DB charm tests at the repo that moved house (https://github.com/canonical/operator/pull/2551)
-* Switch the example charm tests to a `k8s` preset (https://github.com/canonical/operator/pull/2696)
-* Crawl back to the upstream concierge presets (https://github.com/canonical/operator/pull/2699)
+* Point the DB charm tests at the repo that moved house ([#2551](https://github.com/canonical/operator/pull/2551))
+* Switch the example charm tests to a `k8s` preset ([#2696](https://github.com/canonical/operator/pull/2696))
+* Crawl back to the upstream concierge presets ([#2699](https://github.com/canonical/operator/pull/2699))
 
 """
         )
@@ -419,19 +419,19 @@ There are breaking changes in this release. Please review them carefully:
 
 ## Breaking Changes
 
-* Refactor: Rehome the otlp-json package inside ops-tracing (https://github.com/canonical/operator/pull/2585)
+* Refactor: Rehome the otlp-json package inside ops-tracing ([#2585](https://github.com/canonical/operator/pull/2585))
 
 ## Features
 
-* Note which socket Pebble was shouting into (https://github.com/canonical/operator/pull/2555)
+* Note which socket Pebble was shouting into ([#2555](https://github.com/canonical/operator/pull/2555))
 
 ## Fixes
 
-* Tear down `Runtime.exec()` when the charm throws a wobbly (https://github.com/canonical/operator/pull/2581)
+* Tear down `Runtime.exec()` when the charm throws a wobbly ([#2581](https://github.com/canonical/operator/pull/2581))
 
 ## Refactoring
 
-* Swap jsonpatch for a dict-diff we can read (https://github.com/canonical/operator/pull/2578)
+* Swap jsonpatch for a dict-diff we can read ([#2578](https://github.com/canonical/operator/pull/2578))
 
 """
         )
@@ -468,11 +468,11 @@ class TestFormatChanges:
         categories['fix'] = [change]
         return format_changes(categories, '1.2.3', datetime.date(2026, 9, 10), repo=REPO)
 
-    def test_the_pull_request_url_is_rendered_in_parentheses(self):
-        # The full URL rather than `#2684`: a CHANGES.md is read in an
-        # editor, on PyPI and in the docs as well as on GitHub, and only
+    def test_the_pull_request_url_is_rendered_as_a_markdown_link(self):
+        # A Markdown link rather than a bare `#2684`: a CHANGES.md is read in
+        # an editor, on PyPI and in the docs as well as on GitHub, and only
         # GitHub turns `#2684` into a link.
-        assert '* A fix (https://github.com/canonical/operator/pull/2684)' in self.entry(
+        assert '* A fix ([#2684](https://github.com/canonical/operator/pull/2684))' in self.entry(
             Change('A fix', 2684)
         )
 
@@ -487,9 +487,9 @@ class TestFormatChanges:
     def test_the_credit_goes_before_the_reference(self):
         # `* <what> by <who> (<where>)`, which is the shape operator's own
         # hand-written entries use: `* Fix typos in code snippets by
-        # @MattiaSarti (#1750)`.
+        # @ducky-debugger (#1750)`.
         assert (
-            '* A fix by @someone (https://github.com/canonical/operator/pull/2684)'
+            '* A fix by @someone ([#2684](https://github.com/canonical/operator/pull/2684))'
             in self.entry(Change('A fix', 2684, '@someone'))
         )
 
@@ -1087,7 +1087,7 @@ class TestConsoleScript:
         # Including the blank line it ends with: this text is prepended to
         # CHANGES.md verbatim, so the trailing layout is part of the answer.
         assert out == format_changes(categories, '3.8.2', datetime.date(2026, 8, 31), repo=REPO)
-        assert out.endswith('(https://github.com/canonical/operator/pull/2699)\n\n')
+        assert out.endswith('([#2699](https://github.com/canonical/operator/pull/2699))\n\n')
 
     def test_changes_entry_needs_a_repo_to_build_links_from(self):
         # A change carries a number, not a URL, so there is nothing to render
@@ -1118,7 +1118,7 @@ class TestConsoleScript:
         # that was credited no longer is.
         assert (
             '* Stop the framework mistaking two notices for twins '
-            '(https://github.com/canonical/operator/pull/2684)' in out
+            '([#2684](https://github.com/canonical/operator/pull/2684))' in out
         )
         assert '@ducky-debugger' not in out
 
@@ -1132,11 +1132,11 @@ class TestConsoleScript:
         )
         assert (
             '* Stop the framework mistaking two notices for twins by @ducky-debugger '
-            '(https://github.com/canonical/operator/pull/2684)' in out
+            '([#2684](https://github.com/canonical/operator/pull/2684))' in out
         )
         assert (
             '* Stop dressing cross-references up as quotations by Focal Fossa '
-            '(https://github.com/canonical/operator/pull/2666)' in out
+            '([#2666](https://github.com/canonical/operator/pull/2666))' in out
         )
 
     def test_changes_entry_defaults_to_today(self):

@@ -50,7 +50,7 @@ def _bullet(change: Change, reference: str | None) -> str:
     takes its separator with it rather than leaving `by  (#)` behind. The
     credit sits before the reference because that is where
     `canonical/operator`'s hand-written entries have always put it:
-    `* Fix typos in code snippets by @MattiaSarti (#1750)`.
+    `* Fix typos in code snippets by @ducky-debugger (#1750)`.
     """
     parts = [f'* {change.description}']
     if change.credit:
@@ -120,9 +120,11 @@ def format_changes(
     The header is formatted as a top-level heading with the tag and date.
     The content is a Markdown formatted string with sections for each commit type.
     Each item is formatted as a bullet point with the description and a link to
-    the pull request in parentheses. The full URL rather than `#N`: a
-    `CHANGES.md` is read in an editor, on PyPI and in the docs as often as it
-    is read on GitHub, and only GitHub turns `#N` into a link.
+    the pull request in parentheses. A Markdown link rather than a bare
+    `#N`: a `CHANGES.md` is read in an editor, on PyPI and in the docs as
+    often as it is read on GitHub, and only GitHub turns `#N` into a link.
+    The link text stays `#N` so the line still reads the way the
+    hand-written entries always have.
 
     `repo` is the `owner/name` the links point into. It is needed because a
     `Change` carries a number and not a URL -- the number is all a git log
@@ -147,7 +149,7 @@ def format_changes(
                 reference = None
                 if change.pr_number is not None:
                     url = PULL_REQUEST_URL_TEMPLATE.format(repo=repo, number=change.pr_number)
-                    reference = f'({url})'
+                    reference = f'([#{change.pr_number}]({url}))'
                 lines.append(_bullet(change, reference))
             lines.append('')
     return '\n'.join(lines) + '\n'

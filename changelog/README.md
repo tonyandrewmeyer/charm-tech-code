@@ -22,18 +22,18 @@ become one `CHANGES.md` entry:
 
 ## Fixes
 
-* Stop the framework mistaking two notices for twins by @ducky-debugger (https://github.com/canonical/operator/pull/2684)
+* Stop the framework mistaking two notices for twins by @ducky-debugger ([#2684](https://github.com/canonical/operator/pull/2684))
 
 ## Documentation
 
-* Stop dressing cross-references up as quotations (https://github.com/canonical/operator/pull/2666)
+* Stop dressing cross-references up as quotations ([#2666](https://github.com/canonical/operator/pull/2666))
 
 ## CI
 
-* Crawl back to the upstream concierge presets (https://github.com/canonical/operator/pull/2699)
+* Crawl back to the upstream concierge presets ([#2699](https://github.com/canonical/operator/pull/2699))
 ```
 
-Release notes are the same content with `###` headings and `in #2684` in place of the parenthesised URL. The short form is GitHub's own: a release body renders `#2684` as a link to the pull request, where a `CHANGES.md` is read in an editor, on PyPI and in the docs as well, and only GitHub would make a link of it.
+Release notes are the same content with `###` headings and `in #2684` in place of the parenthesised link. The short form is GitHub's own: a release body renders `#2684` as a link to the pull request, where a `CHANGES.md` is read in an editor, on PyPI and in the docs as well, and only GitHub would make a link of it.
 
 Most of the rules are visible there:
 
