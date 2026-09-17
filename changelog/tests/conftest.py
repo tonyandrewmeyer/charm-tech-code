@@ -30,9 +30,12 @@ without a test failing.
 
 from __future__ import annotations
 
+import importlib
+import pkgutil
+
 import pytest
 
-from charm_tech_code.changelog import _authors, _constants, _format, _models, _parse, _version
+import charm_tech_code.changelog
 
 
 class _NoClock:
@@ -54,10 +57,31 @@ class _NoClockModule:
     date = _NoClock
 
 
-#: Every module of the library, whether or not it imports `datetime` today.
-#: `raising=False` below means a module that does not import it is covered in
-#: advance rather than having to be remembered when it does.
-LIBRARY_MODULES = (_authors, _constants, _format, _models, _parse, _version)
+#: The one module allowed to read the clock. See the module docstring.
+UNCHECKED_MODULES = frozenset({'_cli'})
+
+
+def _library_modules() -> tuple[object, ...]:
+    """Every module of the library except `_cli`.
+
+    Discovered rather than listed, so that a module added later is covered
+    without anyone having to remember this file exists. `raising=False` below
+    means a module that does not import `datetime` today is covered in
+    advance rather than having to be remembered when it does.
+    """
+    package = charm_tech_code.changelog
+    modules = tuple(
+        importlib.import_module(f'{package.__name__}.{info.name}')
+        for info in pkgutil.iter_modules(package.__path__)
+        if info.name not in UNCHECKED_MODULES
+    )
+    # An empty tuple would make the fixture a no-op that still passes, which
+    # is the one way this can fail without anyone noticing.
+    assert modules, 'no library modules discovered'
+    return modules
+
+
+LIBRARY_MODULES = _library_modules()
 
 
 @pytest.fixture(autouse=True)

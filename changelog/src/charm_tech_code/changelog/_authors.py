@@ -15,26 +15,10 @@
 
 """Who gets credited in a changelog, and how.
 
-The rule is that a contributor from outside the team that maintains the
-repository is credited by name in the entry, and a member of that team is
-not.
-
 **"Outside the team" is not "outside Canonical".** A contributor from
 another Canonical team has an `@canonical.com` address, no GitHub handle
 anyone can derive from it, and every bit as much claim to the credit as a
 stranger does. They are credited by name.
-
-**The team is a parameter, not a constant.** It drifts -- people join and
-leave -- and it differs per repository, so a list baked in here would be
-wrong somewhere from the day it was written. An empty team credits everyone,
-which is the right way for this to fail: over-crediting is visible in a
-draft release and takes one edit to fix, while quietly crediting nobody is
-invisible until a contributor notices they were left out.
-
-The git log gives a name and an email, never a handle, and only some of that
-is recoverable: see `NOREPLY_EMAIL_REGEX`. Where it is not, the person is
-credited by their name, because the alternatives are to drop them or to
-render a handle that does not exist.
 """
 
 from __future__ import annotations
@@ -79,6 +63,11 @@ def credit_for(name: str, email: str, team: Collection[str]) -> str | None:
         name: The author name, as `%an` gives it.
         email: The author email, as `%ae` gives it.
         team: The maintainers, as emails and/or handles. See `normalise_team`.
+            A parameter rather than a constant because it drifts and differs
+            per repository. An empty team credits everyone, which is the
+            right way for this to fail: over-crediting is visible in a draft
+            release and takes one edit, while crediting nobody is invisible
+            until a contributor notices.
 
     Returns:
         `@handle` when a handle can be recovered from the email, the name

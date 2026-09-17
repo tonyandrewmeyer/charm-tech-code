@@ -13,42 +13,15 @@
 # limitations under the License.
 
 
-r"""The console script: a range of changes on stdin, one answer on stdout.
+"""The console script: a range of changes on stdin, one answer on stdout.
 
 **This module is the package's I/O boundary, and the only one.** Everything
 under it is text in, text out -- no network, no git, no filesystem, no clock
 -- and the test suite's `no_clock` fixture holds that line by making a
 `datetime` call from the library modules fail. This file is deliberately
-outside that fixture, because `--date` has to default to something and
-"today" is the only sensible default for a workflow that runs on the day it
-releases. If you find yourself wanting the clock, or a file, or an API call,
-in any other module of this package: it goes here instead.
-
-Note what is *not* here: running `git log`. The log text arrives on stdin
-exactly as the notes text does, so the boundary this module draws is around
-the clock and the standard streams, and the caller keeps the subprocess.
-
-The shape is driven by how a GitHub Actions step consumes a result, which is
-either as a `$GITHUB_OUTPUT` line or as a file. A `$GITHUB_OUTPUT` line takes
-a scalar comfortably and a multi-line document only through a heredoc
-delimiter that the document itself must not contain -- so the two commands
-that emit Markdown emit it on stdout, for the step to redirect into a file,
-and the two that emit a scalar emit a single bare word with no decoration, so
-that `size=$(changelog bump-size < log.txt)` is the whole of the plumbing::
-
-    git log --reverse --no-merges --format="$(changelog git-log-format)" \\
-        "$LAST_TAG..$BRANCH" > log.txt
-    SIZE=$(changelog bump-size --team "$TEAM" < log.txt)
-    VERSION=$(changelog next-version --previous "$LAST_TAG" --team "$TEAM" < log.txt)
-    changelog release-notes --repo "$REPO" --team "$TEAM" < log.txt > release-notes.md
-    changelog changes-entry --tag "$VERSION" --team "$TEAM" < log.txt > changes-entry.md
-
-Five invocations re-parse the same text four times, which costs nothing and
-buys each step an output that goes where it belongs without any reshaping.
-`git-log-format` is the odd one out: it reads nothing and prints the
-`--format` string the other four expect, so that the exact sequence of
-`%x1e` and `%x1f` lives in one place rather than being copied into every
-workflow that calls this.
+outside it, because `--date` has to default to today. If you find yourself
+wanting the clock, or a file, or an API call, in any other module of this
+package: it goes here instead.
 """
 
 from __future__ import annotations
@@ -56,11 +29,11 @@ from __future__ import annotations
 import argparse
 import datetime
 import sys
+import textwrap
 from collections.abc import Sequence
 
 from ._constants import GIT_LOG_FORMAT
 from ._format import format_changes, format_release_notes
-from ._models import Change
 from ._parse import parse_git_log
 from ._version import infer_bump_size, next_version
 
@@ -95,15 +68,13 @@ def _input_options() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
         '--team',
-        action='append',
-        default=None,
+        default='',
         metavar='EMAIL-OR-HANDLE,...',
         help=(
             'Authors not to credit, comma-separated, as email addresses '
-            'and/or GitHub handles. Repeatable. These are the people who '
-            'maintain the repository; everyone else is credited by handle, '
-            'or by name where no handle can be worked out. The default '
-            'credits everyone.'
+            'and/or GitHub handles. These are the people who maintain the '
+            'repository; everyone else is credited by handle, or by name '
+            'where no handle can be worked out. The default credits everyone.'
         ),
     )
     return parser
@@ -129,6 +100,17 @@ def _build_parser() -> argparse.ArgumentParser:
             'Turn a range of changes, read from stdin, into our changelog '
             'format or into a version decision.'
         ),
+        epilog=textwrap.dedent("""\
+            A release pipeline, end to end:
+
+              git log --reverse --no-merges --format="$(changelog git-log-format)" \\
+                  "$LAST_TAG..$BRANCH" > log.txt
+              SIZE=$(changelog bump-size --team "$TEAM" < log.txt)
+              VERSION=$(changelog next-version --previous "$LAST_TAG" --team "$TEAM" < log.txt)
+              changelog release-notes --repo "$REPO" --team "$TEAM" < log.txt > release-notes.md
+              changelog changes-entry --tag "$VERSION" --team "$TEAM" < log.txt > changes-entry.md
+        """),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest='command', required=True)
     shared = [_input_options()]
@@ -225,24 +207,6 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _team(args: argparse.Namespace) -> list[str]:
-    """`--team a,b --team c` as one flat list.
-
-    Both spellings, because a workflow passing a repository variable has one
-    string with commas in it and a human typing the command has neither.
-    """
-    members: list[str] = []
-    for group in args.team or ():
-        members.extend(group.split(','))
-    return members
-
-
-def _categories(args: argparse.Namespace, text: str) -> dict[str, list[Change]]:
-    """Parse the git log on stdin into categories."""
-    repo = getattr(args, 'repo', None)
-    return parse_git_log(text, team=_team(args), repo=repo)
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse the changes on stdin and print the answer the subcommand asks for."""
     args = _build_parser().parse_args(argv)
@@ -251,7 +215,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         _emit(GIT_LOG_FORMAT)
         return 0
 
-    categories = _categories(args, sys.stdin.read())
+    categories = parse_git_log(
+        sys.stdin.read(),
+        # A workflow passes the team as one repository variable with commas
+        # in it, which is the only spelling `--team` takes. Empty entries are
+        # dropped by `normalise_team`.
+        team=args.team.split(','),
+        # Only `release-notes` and `changes-entry` take `--repo`.
+        repo=getattr(args, 'repo', None),
+    )
 
     if args.command == 'bump-size':
         _emit(infer_bump_size(categories))

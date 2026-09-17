@@ -105,8 +105,8 @@ REVERTS_REGEX = re.compile(
 )
 
 #: A GitHub no-reply address, which is the one author email a handle can be
-#: recovered from: ``46688206+Ali-932@users.noreply.github.com`` is
-#: ``@Ali-932``. It is the default for a GitHub account with a private email,
+#: recovered from: ``46688206+ducky-debugger@users.noreply.github.com`` is
+#: ``@ducky-debugger``. It is the default for a GitHub account with a private email,
 #: so it is the common form for exactly the drive-by external contributor
 #: this is here to credit. The older suffix-free form is accepted too, and so
 #: is the ``[bot]`` a GitHub App's address carries.
@@ -118,20 +118,21 @@ NOREPLY_EMAIL_REGEX = re.compile(
 
 #: The categories a changelog has, in the order they are rendered.
 #:
-#: This is also the filter. A conventional-commit type that is not a key here
-#: is dropped from the changelog entirely, and `chore` is the type that makes
-#: that matter: it is a real type, accepted by the PR-title check, but it is
-#: deliberately not a category. Dependency bumps, charm-pin updates and the
-#: release's own version-bump commit are all `chore`, and none of them is
-#: something a reader of a changelog is looking for. In a typical operator
-#: release that is a third to a half of the commits in the range. Dropping
-#: them is the intended behaviour, not an oversight in the type list, so
-#: please do not "fix" it by adding a `chore` key.
+#: Two of these are meta categories that nothing parses into directly.
 #:
-#: `breaking` goes the other way round: it is a key here but is not a
-#: conventional-commit type, so nothing ever parses into it directly. A `!`
-#: after the real type moves an entry into it instead, keeping its real type
-#: as a prefix (`Feat: ...`), and it renders first.
+#: `breaking` is filled by a `!` after the real type, which moves the entry
+#: out of its own category and into this one, keeping its real type as a
+#: prefix (`Feat: ...`). It renders first.
+#:
+#: `unknown` is filled by anything this package cannot place: a
+#: conventional-commit type that is neither a category nor one of
+#: `IGNORED_TYPES`, and a subject that is not conventional at all. It renders
+#: last, under `UNKNOWN_PREAMBLE`, so that the human reading the draft
+#: release sees what needs categorising by hand. Silently dropping these is
+#: what the format used to do, and it makes a typo in a commit type
+#: indistinguishable from a deliberate omission.
+#:
+#: Deliberate omissions are `IGNORED_TYPES`, which is where `chore` lives.
 CATEGORIES: tuple[str, ...] = (
     'breaking',
     'feat',
@@ -142,10 +143,26 @@ CATEGORIES: tuple[str, ...] = (
     'perf',
     'ci',
     'revert',
+    'unknown',
 )
 
 #: The meta category breaking changes are collected into.
 BREAKING = 'breaking'
+
+#: The meta category anything unplaceable is collected into.
+UNKNOWN = 'unknown'
+
+#: Real conventional-commit types that are deliberately not rendered, as
+#: distinct from the unrecognised ones that go to `UNKNOWN`.
+#:
+#: `chore` is the whole list. It is accepted by the PR-title check, but
+#: dependency bumps, charm-pin updates and the release's own version-bump
+#: commit are all `chore`, and none of them is something a reader of a
+#: changelog is looking for. In a typical operator release that is a third to
+#: a half of the commits in the range. Dropping them is the intended
+#: behaviour, not an oversight in the type list, so please do not "fix" it by
+#: adding a `chore` category.
+IGNORED_TYPES: tuple[str, ...] = ('chore',)
 
 #: The one real conventional-commit type the bump-size rule cares about.
 FEATURE = 'feat'
@@ -200,6 +217,7 @@ CATEGORY_HEADINGS = {
     'refactor': 'Refactoring',
     'revert': 'Reverted',
     'breaking': 'Breaking Changes',
+    'unknown': 'Uncategorised',
 }
 
 #: The sentence under the release notes' `### Breaking Changes` heading. A
@@ -207,3 +225,11 @@ CATEGORY_HEADINGS = {
 #: sometimes rides in a minor release -- so this calling-out is what the bent
 #: rule relies on.
 BREAKING_PREAMBLE = 'There are breaking changes in this release. Please review them carefully:'
+
+#: The sentence under the `Uncategorised` heading. These entries are the ones
+#: the package could not place, and the draft release is where a human is
+#: already reading the notes, so this is the cheapest place to ask them to.
+UNKNOWN_PREAMBLE = (
+    'These changes have a commit type this changelog does not recognise, or '
+    'no conventional-commit type at all, and need categorising by hand:'
+)

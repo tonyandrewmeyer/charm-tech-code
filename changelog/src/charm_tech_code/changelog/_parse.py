@@ -44,10 +44,12 @@ from ._constants import (
     COMMIT_SUBJECT_REGEX,
     GIT_LOG_FIELD_SEPARATOR,
     GIT_LOG_RECORD_SEPARATOR,
+    IGNORED_TYPES,
     PR_SUFFIX_REGEX,
     REVERT,
     REVERT_OF_BREAKING_TYPES,
     REVERTS_REGEX,
+    UNKNOWN,
 )
 from ._models import Change
 
@@ -106,12 +108,13 @@ def _parse_reverts(body: str, repo: str | None) -> int | None:
 
 
 def _parse_commit(record: str, team: Collection[str], repo: str | None) -> _Commit | None:
-    """One `GIT_LOG_FORMAT` record, or `None` if it is not a change.
+    """One `GIT_LOG_FORMAT` record, or `None` if the record is empty.
 
     A subject that is not a conventional-commit one -- a merge commit, or
-    anything from before the convention was adopted -- is not a changelog
-    entry and is dropped here, the same way the notes parser drops a line
-    that is not a bullet.
+    anything from before the convention was adopted -- is kept, under the
+    `UNKNOWN` meta category and with its subject verbatim, rather than being
+    dropped. There is no type to strip, and guessing one would be worse than
+    showing the human what was actually written.
     """
     name, _, rest = record.partition(GIT_LOG_FIELD_SEPARATOR)
     email, _, rest = rest.partition(GIT_LOG_FIELD_SEPARATOR)
@@ -125,7 +128,18 @@ def _parse_commit(record: str, team: Collection[str], repo: str | None) -> _Comm
 
     match = COMMIT_SUBJECT_REGEX.match(subject)
     if not match:
-        return None
+        if not subject:
+            return None
+        return _Commit(
+            category=UNKNOWN,
+            breaking=False,
+            description=subject,
+            pr_number=pr_number,
+            credit=credit_for(name, email, team),
+            reverts=_parse_reverts(body, repo),
+            reverted_type=None,
+            reverted_type_is_breaking=False,
+        )
 
     summary = match.group('summary').strip()
     reverted_type = None
@@ -233,7 +247,7 @@ def parse_git_log(
     categories = _empty_categories()
     cancelled = _cancelled(commits)
     for index, commit in enumerate(commits):
-        if index in cancelled or commit.category not in categories:
+        if index in cancelled or commit.category in IGNORED_TYPES:
             continue
         change = Change(commit.description, commit.pr_number, commit.credit)
         breaking = commit.breaking or (
@@ -245,6 +259,14 @@ def parse_git_log(
         )
         if breaking:
             categories[BREAKING].append(
+                change._replace(
+                    description=f'{commit.category.capitalize()}: {change.description}'
+                )
+            )
+        elif commit.category not in categories:
+            # A real conventional-commit type that is not a category: keep
+            # the type, since it is the thing the human has to act on.
+            categories[UNKNOWN].append(
                 change._replace(
                     description=f'{commit.category.capitalize()}: {change.description}'
                 )

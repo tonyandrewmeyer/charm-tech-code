@@ -27,6 +27,8 @@ from ._constants import (
     CATEGORY_HEADINGS,
     FULL_CHANGELOG_PREFIX,
     PULL_REQUEST_URL_TEMPLATE,
+    UNKNOWN,
+    UNKNOWN_PREAMBLE,
 )
 from ._models import Change
 
@@ -97,6 +99,8 @@ def format_release_notes(
             continue
         if items:
             lines.append(f'### {commit_type_to_category(commit_type)}')
+            if commit_type == UNKNOWN:
+                lines.append(f'{UNKNOWN_PREAMBLE}\n')
             lines.extend(_bullet(change, _link(change, repo)) for change in items)
             lines.append('')
     if compare_url:

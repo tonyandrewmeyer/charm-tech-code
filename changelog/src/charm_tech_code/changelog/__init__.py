@@ -16,55 +16,8 @@
 """Turn a range of commits into our changelog format.
 
 Text in, structured data and formatted strings out. Nothing here touches the
-network, git, the filesystem or the clock, so a caller supplies the log text
-and the date and decides what to do with what comes back::
-
-    log = subprocess.run(
-        ['git', 'log', '--reverse', '--no-merges', f'--format={GIT_LOG_FORMAT}', '3.8.1..3.8.2'],
-        capture_output=True, text=True, check=True,
-    ).stdout
-    categories = parse_git_log(log, team=MAINTAINERS, repo='canonical/operator')
-    notes = format_release_notes(categories, None, repo='canonical/operator')
-    entry = format_changes(categories, '3.8.2', datetime.date.today())
-
-The same parse answers how big a release the range adds up to, and what that
-makes the version after `previous`::
-
-    size = infer_bump_size(categories)
-    version = next_version(previous=previous, size=size)
-
-The format is the package's own, not a parameter -- see `_constants` for
-what that means and why `chore` commits do not appear in a changelog. The
-`changelog` console script (`_cli`) wraps all of the above for a workflow
-step, and is the one place in the package that does any I/O.
+network, git, the filesystem or the clock: the `changelog` console script
+(`_cli`) is the package's one I/O boundary, and is how a workflow step calls
+this. See `_constants` for the format, and why `chore` commits do not appear
+in a changelog.
 """
-
-from __future__ import annotations
-
-from ._constants import (
-    CATEGORIES,
-    CATEGORY_HEADINGS,
-    GIT_LOG_FORMAT,
-    MINOR_BUMP_CATEGORIES,
-)
-from ._format import commit_type_to_category, format_changes, format_release_notes
-from ._models import Change
-from ._parse import parse_git_log
-from ._version import MINOR, PATCH, BumpSize, infer_bump_size, next_version
-
-__all__ = [
-    'CATEGORIES',
-    'CATEGORY_HEADINGS',
-    'GIT_LOG_FORMAT',
-    'MINOR',
-    'MINOR_BUMP_CATEGORIES',
-    'PATCH',
-    'BumpSize',
-    'Change',
-    'commit_type_to_category',
-    'format_changes',
-    'format_release_notes',
-    'infer_bump_size',
-    'next_version',
-    'parse_git_log',
-]
