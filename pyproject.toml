@@ -83,6 +83,11 @@ ignore = [
     "TC003",
     # `assert` is fine.
     "S101",
+    # Shelling out is the job in some of these packages, not a smell: the
+    # notifier drives `gh` and the changelog reads a `git log`. Both are
+    # ignored across the team's repositories for the same reason.
+    "S404",
+    "S603",
     # Magic methods and `__init__` do not need docstrings.
     "D105",
     "D107",

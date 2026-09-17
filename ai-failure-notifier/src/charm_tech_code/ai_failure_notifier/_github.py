@@ -110,10 +110,8 @@ def fetch_run_meta(repo: str, run_id: str) -> dict[str, str]:
 def fetch_issue_texts(repo: str, number: int) -> list[str]:
     """Fetch an issue's body plus all comment bodies, for marker scanning."""
     data = gh_json('issue', 'view', str(number), '--repo', repo, '--json', 'body,comments') or {}
-    texts = [data.get('body') or '']
-    for c in data.get('comments') or []:
-        texts.append(c.get('body') or '')
-    return texts
+    comments = data.get('comments') or []
+    return [data.get('body') or '', *(comment.get('body') or '' for comment in comments)]
 
 
 def resolve_origin(
@@ -138,7 +136,7 @@ def resolve_origin(
     issue keeps that lookup to reading the one issue we were handed.
     """
     texts = [(notify_issue, text) for text in fetch_issue_texts(repo, notify_issue)]
-    enriched_issue, origin_kind, origin_issue = find_run_markers(texts, run_id)
+    enriched_issue, origin_kind, _ = find_run_markers(texts, run_id)
     # The passed-in values win: a marker we failed to find on the issue does
     # not make the issue the wrong one.
     return enriched_issue, notify_origin or origin_kind, notify_issue
