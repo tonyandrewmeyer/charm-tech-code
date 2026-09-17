@@ -52,17 +52,34 @@ def drop_inapplicable_fields(entry: Any) -> tuple[Any, list[str]]:
     return {k: v for k, v in entry.items() if k not in dropped}, dropped
 
 
+def coerce_target_issue(entry: Any) -> Any:
+    """Turn a `target_issue` the model wrote as text into the integer it means.
+
+    Issues are written `#44` everywhere a person sees them, and the model
+    returns that string often enough to matter: the schema wants an integer, so
+    the whole envelope was rejected and a usable body was thrown away for a `#`.
+    Anything that is not a plain issue reference is left exactly as it is, for
+    the schema to reject on its own terms.
+    """
+    if not isinstance(entry, dict) or not isinstance(entry.get('target_issue'), str):
+        return entry
+    text = entry['target_issue'].strip().removeprefix('#')
+    if not text.isdigit():
+        return entry
+    return {**entry, 'target_issue': int(text)}
+
+
 def normalise_envelope(envelope: Any) -> tuple[Any, list[str]]:
     """Drop inapplicable fields from the envelope and each `also` entry."""
     if not isinstance(envelope, dict):
         return envelope, []
-    cleaned, dropped = drop_inapplicable_fields(envelope)
+    cleaned, dropped = drop_inapplicable_fields(coerce_target_issue(envelope))
     notes = [f'envelope: {f}' for f in dropped]
     also = cleaned.get('also')
     if isinstance(also, list):
         entries: list[Any] = []
         for i, entry in enumerate(also):
-            entry, entry_dropped = drop_inapplicable_fields(entry)
+            entry, entry_dropped = drop_inapplicable_fields(coerce_target_issue(entry))
             notes += [f'envelope.also[{i}]: {f}' for f in entry_dropped]
             entries.append(entry)
         cleaned = {**cleaned, 'also': entries}

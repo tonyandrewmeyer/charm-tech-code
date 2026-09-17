@@ -198,3 +198,38 @@ def existing_labels(repo: str) -> set[str]:
 def filter_labels(labels: list[str], available: set[str]) -> list[str]:
     """Drop labels that don't already exist in the repo (never auto-create)."""
     return [label for label in labels if label in available]
+
+
+def existing_issue_types(repo: str) -> set[str]:
+    """Return the issue type names enabled for `repo`, which may be none.
+
+    Issue types come from the owning organisation, so a repo can have none at
+    all: a personal fork returns `null` here, and so does any repo whose org
+    has not enabled them.
+    """
+    owner, _, name = repo.partition('/')
+    query = (
+        'query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) '
+        '{ issueTypes(first: 50) { nodes { name isEnabled } } } }'
+    )
+    data = (
+        gh_json(
+            'api', 'graphql', '-f', f'query={query}', '-F', f'owner={owner}', '-F', f'name={name}'
+        )
+        or {}
+    )
+    repository = (data.get('data') or {}).get('repository') or {}
+    types = repository.get('issueTypes') or {}
+    return {node['name'] for node in types.get('nodes') or [] if node.get('isEnabled')}
+
+
+def match_issue_type(issue_type: str | None, available: set[str]) -> str | None:
+    """Resolve `issue_type` to the repo's own spelling, or `None` if it has no such type.
+
+    The model is asked for a lowercase name, and GitHub's are capitalised, so
+    the match ignores case and the repo's spelling is what gets passed on.
+    """
+    if not issue_type:
+        return None
+    folded = issue_type.casefold()
+    return next((name for name in sorted(available) if name.casefold() == folded), None)

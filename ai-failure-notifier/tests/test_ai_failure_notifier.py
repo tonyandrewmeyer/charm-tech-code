@@ -832,6 +832,31 @@ class GhCallShapeTests(unittest.TestCase):
         self.assertEqual(args[:2], ('label', 'list'))
         self.assertEqual(args[args.index('--json') + 1], 'name')
 
+    def test_existing_issue_types_returns_the_enabled_ones(self):
+        gh_calls = self._capture(
+            '{"data": {"repository": {"issueTypes": {"nodes": ['
+            '{"name": "Bug", "isEnabled": true}, '
+            '{"name": "Task", "isEnabled": true}, '
+            '{"name": "Epic", "isEnabled": false}]}}}}'
+        )
+        with mock.patch.object(_github, 'gh', side_effect=gh_calls):
+            types = _github.existing_issue_types('example/repo')
+        self.assertEqual(types, {'Bug', 'Task'})
+        args = gh_calls.call_args.args
+        self.assertEqual(args[:2], ('api', 'graphql'))
+
+    def test_existing_issue_types_tolerates_a_repo_with_none(self):
+        """A personal fork, or any repo whose org has not enabled types."""
+        gh_calls = self._capture('{"data": {"repository": {"issueTypes": null}}}')
+        with mock.patch.object(_github, 'gh', side_effect=gh_calls):
+            self.assertEqual(_github.existing_issue_types('example/repo'), set())
+
+    def test_match_issue_type_ignores_case_and_uses_the_repo_spelling(self):
+        self.assertEqual(_github.match_issue_type('bug', {'Bug', 'Task'}), 'Bug')
+        self.assertIsNone(_github.match_issue_type('bug', set()))
+        self.assertIsNone(_github.match_issue_type('chore', {'Bug', 'Task'}))
+        self.assertIsNone(_github.match_issue_type(None, {'Bug'}))
+
 
 class NormalisationTests(unittest.TestCase):
     """Fields that do not apply to the chosen action are dropped, not fatal.
@@ -897,6 +922,65 @@ class NormalisationTests(unittest.TestCase):
         }
         cleaned, dropped = _envelope.normalise_envelope(envelope)
         self.assertEqual(dropped, ['envelope.also[0]: title'])
+        self.assertEqual(_envelope.validate_envelope(cleaned), [])
+
+    def test_a_hash_prefixed_target_issue_is_coerced(self):
+        """The model writes issues the way people do, and the schema wants an int."""
+        envelope: dict[str, Any] = {
+            'action': 'comment',
+            'target_issue': '#44',
+            'body': 'b',
+            'dedup_reason': 'd',
+            'confidence': 'low',
+        }
+        cleaned, dropped = _envelope.normalise_envelope(envelope)
+        self.assertEqual(cleaned['target_issue'], 44)
+        self.assertEqual(dropped, [])
+        self.assertEqual(_envelope.validate_envelope(cleaned), [])
+
+    def test_a_bare_digit_string_target_issue_is_coerced(self):
+        envelope: dict[str, Any] = {
+            'action': 'comment',
+            'target_issue': ' 44 ',
+            'body': 'b',
+            'dedup_reason': 'd',
+            'confidence': 'low',
+        }
+        cleaned, _ = _envelope.normalise_envelope(envelope)
+        self.assertEqual(cleaned['target_issue'], 44)
+
+    def test_a_target_issue_that_is_not_a_reference_is_left_for_the_schema(self):
+        envelope: dict[str, Any] = {
+            'action': 'comment',
+            'target_issue': 'the loki one',
+            'body': 'b',
+            'dedup_reason': 'd',
+            'confidence': 'low',
+        }
+        cleaned, _ = _envelope.normalise_envelope(envelope)
+        self.assertEqual(cleaned['target_issue'], 'the loki one')
+        self.assertNotEqual(_envelope.validate_envelope(cleaned), [])
+
+    def test_also_entries_get_the_same_coercion(self):
+        inner: dict[str, Any] = {
+            'action': 'comment',
+            'target_issue': '#1',
+            'body': 'b',
+            'dedup_reason': 'd',
+            'confidence': 'low',
+        }
+        envelope: dict[str, Any] = {
+            'action': 'new',
+            'title': 't',
+            'body': 'b',
+            'labels': [],
+            'issue_type': None,
+            'dedup_reason': 'd',
+            'confidence': 'low',
+            'also': [inner],
+        }
+        cleaned, _ = _envelope.normalise_envelope(envelope)
+        self.assertEqual(cleaned['also'][0]['target_issue'], 1)
         self.assertEqual(_envelope.validate_envelope(cleaned), [])
 
     def test_nothing_dropped_leaves_the_envelope_alone(self):
@@ -986,6 +1070,73 @@ class BodyFooterTests(unittest.TestCase):
         args = gh_calls.call_args.args
         self.assertEqual(args[:3], ('issue', 'comment', '7'))
         self.assertIn('Workflow: ops Smoke Tests', args[args.index('--body') + 1])
+
+    def test_a_missing_issue_type_creates_one_issue_and_not_two(self):
+        """The type is resolved before the create, so there is nothing to retry.
+
+        `gh issue create --type` creates the issue and only then fails on the
+        type, so retrying without it opened a second, identical issue.
+        """
+        gh_calls = mock.Mock(
+            return_value=mock.Mock(returncode=0, stdout='https://x/issues/9', stderr='')
+        )
+        entry: dict[str, Any] = {
+            'action': 'new',
+            'title': 't',
+            'body': 'Detail.',
+            'labels': [],
+            'issue_type': 'bug',
+        }
+        with (
+            mock.patch.object(_github, 'gh', side_effect=gh_calls),
+            mock.patch.object(_github, 'existing_labels', return_value=set()),
+            mock.patch.object(_github, 'existing_issue_types', return_value=set()),
+            mock.patch.object(_summary, 'write_step_summary') as summary,
+        ):
+            _apply.apply_entry('example/repo', entry, '<!-- m -->', 'ops Smoke Tests')
+        gh_calls.assert_called_once()
+        self.assertNotIn('--type', gh_calls.call_args.args)
+        self.assertIn('bug', summary.call_args.args[0])
+
+    def test_a_known_issue_type_is_passed_in_the_repo_spelling(self):
+        gh_calls = mock.Mock(
+            return_value=mock.Mock(returncode=0, stdout='https://x/issues/9', stderr='')
+        )
+        entry: dict[str, Any] = {
+            'action': 'new',
+            'title': 't',
+            'body': 'Detail.',
+            'labels': [],
+            'issue_type': 'bug',
+        }
+        with (
+            mock.patch.object(_github, 'gh', side_effect=gh_calls),
+            mock.patch.object(_github, 'existing_labels', return_value=set()),
+            mock.patch.object(_github, 'existing_issue_types', return_value={'Bug', 'Task'}),
+        ):
+            _apply.apply_entry('example/repo', entry, '<!-- m -->', 'ops Smoke Tests')
+        gh_calls.assert_called_once()
+        args = gh_calls.call_args.args
+        self.assertEqual(args[args.index('--type') + 1], 'Bug')
+
+    def test_no_issue_type_asked_for_costs_no_lookup(self):
+        gh_calls = mock.Mock(
+            return_value=mock.Mock(returncode=0, stdout='https://x/issues/9', stderr='')
+        )
+        entry: dict[str, Any] = {
+            'action': 'new',
+            'title': 't',
+            'body': 'Detail.',
+            'labels': [],
+            'issue_type': None,
+        }
+        with (
+            mock.patch.object(_github, 'gh', side_effect=gh_calls),
+            mock.patch.object(_github, 'existing_labels', return_value=set()),
+            mock.patch.object(_github, 'existing_issue_types') as types,
+        ):
+            _apply.apply_entry('example/repo', entry, '<!-- m -->', 'ops Smoke Tests')
+        types.assert_not_called()
 
     def test_applied_new_issue_body_has_the_footer(self):
         gh_calls = mock.Mock(
@@ -1132,21 +1283,53 @@ class OpenRouterCallTests(unittest.TestCase):
         )
         self.assertTrue(sent['response_format']['json_schema']['strict'])
 
-    def test_http_error_propagates_so_main_can_fall_back(self):
+    def _http_error(self, status: int, body: bytes) -> urllib.error.HTTPError:
         # HTTPError holds a file object and warns on implicit cleanup, which
         # the unit env's -W error turns into a failure. Give it a real `fp`
         # (it fabricates a tempfile when passed None) and close it explicitly.
         error = urllib.error.HTTPError(
             'https://openrouter.ai/api/v1/chat/completions',
-            500,
+            status,
             'boom',
             email.message.Message(),
-            io.BytesIO(b''),
+            io.BytesIO(body),
         )
         self.addCleanup(error.close)
+        return error
+
+    def test_http_error_raises_so_main_can_fall_back(self):
+        error = self._http_error(500, b'')
         with mock.patch.object(_openrouter.urllib.request, 'urlopen', side_effect=error):
-            with self.assertRaises(urllib.error.HTTPError):
+            with self.assertRaises(RuntimeError):
                 _openrouter.call_openrouter('sys', 'user', 'm', 'k')
+
+    def test_the_error_carries_openrouters_own_explanation(self):
+        """A 400 says only "Bad Request"; which of the model, key or schema is in the body."""
+        body = json.dumps({
+            'error': {'code': 400, 'message': "Invalid schema: 'required' is missing 'also'"}
+        }).encode()
+        error = self._http_error(400, body)
+        with mock.patch.object(_openrouter.urllib.request, 'urlopen', side_effect=error):
+            with self.assertRaises(RuntimeError) as raised:
+                _openrouter.call_openrouter('sys', 'user', 'm', 'k')
+        message = str(raised.exception)
+        self.assertIn('HTTP Error 400', message)
+        self.assertIn("'required' is missing 'also'", message)
+
+    def test_a_body_that_is_not_json_is_reported_as_it_came(self):
+        error = self._http_error(502, b'<html>upstream is unwell</html>')
+        with mock.patch.object(_openrouter.urllib.request, 'urlopen', side_effect=error):
+            with self.assertRaises(RuntimeError) as raised:
+                _openrouter.call_openrouter('sys', 'user', 'm', 'k')
+        self.assertIn('upstream is unwell', str(raised.exception))
+
+    def test_an_unreadable_body_still_leaves_the_status(self):
+        error = self._http_error(429, b'')
+        error.read = mock.Mock(side_effect=OSError('connection reset'))
+        with mock.patch.object(_openrouter.urllib.request, 'urlopen', side_effect=error):
+            with self.assertRaises(RuntimeError) as raised:
+                _openrouter.call_openrouter('sys', 'user', 'm', 'k')
+        self.assertIn('HTTP Error 429', str(raised.exception))
 
 
 class ResolveOriginTests(unittest.TestCase):

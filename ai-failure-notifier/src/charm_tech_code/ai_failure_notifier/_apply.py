@@ -60,19 +60,22 @@ def apply_entry(
         args = ['issue', 'create', '--repo', repo, '--title', entry['title'], '--body', body]
         for label in labels:
             args += ['--label', label]
-        issue_type = entry.get('issue_type')
-        result = None
+        # Resolved before the issue is created, never retried after it: a
+        # failed `gh issue create --type` has already created the issue, so a
+        # second attempt without the type is a duplicate rather than a repair.
+        wanted_type = entry.get('issue_type')
+        issue_type = (
+            _github.match_issue_type(wanted_type, _github.existing_issue_types(repo))
+            if wanted_type
+            else None
+        )
+        if wanted_type and not issue_type:
+            _summary.write_step_summary(
+                f'Dropped issue type "{wanted_type}", which this repo does not have.'
+            )
         if issue_type:
-            result = _github.gh(*args, '--type', issue_type, check=False)
-            if result.returncode != 0:
-                _summary.write_step_summary(
-                    f'`gh issue create --type {issue_type}` failed ({result.stderr.strip()}); '
-                    'retrying without --type.'
-                )
-                result = None
-        if result is None:
-            result = _github.gh(*args)
-        return result.stdout.strip()
+            args += ['--type', issue_type]
+        return _github.gh(*args).stdout.strip()
     else:
         target = entry.get('target_issue', default_target)
         _github.gh('issue', 'comment', str(target), '--repo', repo, '--body', body)
