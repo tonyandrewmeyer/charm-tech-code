@@ -115,3 +115,41 @@ MARKER_RE = re.compile(
     """,
     re.VERBOSE,
 )
+
+# The signature stamp, a second hidden comment the enricher writes beside the
+# marker above:
+#   <!-- ai-failure-notifications:signature {"run":"123","tests":[...],...} -->
+#
+# The marker's :sig= is a sha1, which is one-way: it can say "the same run was
+# already enriched here" and nothing else. This carries the fields themselves,
+# so that the next run's candidate block can show a previous failure's test ids
+# and error classes -- which is what the prompt's strong rung matches on, and
+# what no candidate ever carried before. Deliberately a separate comment rather
+# than a longer marker: MARKER_RE stays exactly as it was, and rung zero cannot
+# be affected by anything that happens here.
+#
+# Non-greedy to the first "-->" so two stamps in one body parse as two.
+SIGNATURE_STAMP_RE = re.compile(
+    r'<!--\s*' + re.escape(MARKER_PREFIX) + r':signature\s+(?P<json>\{.*?\})\s*-->',
+    re.DOTALL,
+)
+
+# An exception class as it appears in a pytest summary line or a traceback's
+# last line: the leading dotted path is allowed, the trailing ": message" is
+# not part of it. Narrower than TRACEBACK_END because it has to match mid-line.
+ERROR_CLASS = re.compile(r'\b[A-Z][A-Za-z_.]*(?:Error|Exception|Warning)\b')
+
+# How many of each field the stamp keeps. A run with fifty failing tests does
+# not need fifty node ids in someone else's candidate block; the first few are
+# what a match is made on, and the cap bounds both the issue body and the
+# prompt.
+MAX_STAMPED_ITEMS = 6
+
+# Bounds on what one candidate contributes to the block. Three candidates times
+# these is the whole cost of the change, in tokens.
+MAX_EXCERPT_CHARS = 300
+MAX_COMMENT_CHARS = 400
+# How many of a candidate's trailing comments the block shows. See
+# CandidateIssue.recent_comments for why it is not 1.
+MAX_RECENT_COMMENTS = 2
+MAX_SIGNATURE_CHARS = 600

@@ -144,14 +144,44 @@ Do not add sections beyond these. In particular there is no "suggested
 fix", "next steps", "workaround" or "recommendation" section, and none may
 be added.
 
-For `action: "comment"`, keep the comment short: what matches the existing
-issue (or what's new/different), and nothing else.
+For `action: "comment"`, `body` is the text of the comment you are posting.
+It is required, for a comment exactly as much as for a new issue: never omit
+it, never set it to null, and never put the comment text under any other key.
+`dedup_reason` is not a substitute -- that is your reasoning about the
+decision, and it is not posted anywhere.
+
+Keep the comment short: what matches the existing
+issue (or what's new/different), and nothing else. Name the concrete thing
+that matches -- the test id, the error class, the failed step or the job --
+rather than only asserting that it is the same failure, because a reader of
+the issue cannot check "same as before" against anything. Do not add a link
+to the run: one is appended to every comment automatically, and a second
+would be noise.
 
 ## Deciding comment vs new
 
-You are given up to three candidate existing issues (title + excerpt), already
-pre-filtered to the same workflow by a coarser deterministic search. Some
-candidates may be marked "(closed ...)" -- these are recently-closed
+You are given up to three candidate existing issues, already pre-filtered to
+the same workflow by a coarser deterministic search. Each is its number and
+title, followed by up to three `>` lines of evidence about what it is
+actually about:
+
+- the opening line of its body. For an issue opened automatically and never
+  edited this is only "Scheduled workflow 'X' failed: <url>", which tells you
+  nothing about the failure; do not read it as evidence of a match.
+- `failure signature (run <id>): tests ...; errors ...; steps ...; jobs ...`
+  -- present only when this same tool has previously written about that
+  issue, and then it is the deterministic parser's own output for that
+  earlier run, in the same fields as the signature above. This is the
+  strongest evidence available to you: it is directly comparable with the
+  signature JSON, field for field. Its absence means nobody has run this
+  tool on that issue yet -- it is NOT evidence that the failures differ.
+- `most recent comment: ...` -- present when the issue has any comments.
+  These are written by maintainers and are usually where an
+  automatically-opened issue's actual diagnosis is (a test name, what timed
+  out, which channel). Treat a test id or an error class named in a comment
+  as naming that issue's failure, the same as if it were in the body.
+
+Some candidates may be marked "(closed ...)" -- these are recently-closed
 issues included for context only; never target a closed issue with
 `action: "comment"`, and never let a closed candidate alone justify
 `confidence: "high"`.
@@ -159,7 +189,9 @@ issues included for context only; never target a closed issue with
 - **Strong** -- at least one `pytest_failures[].test` (or, for
   infra/tail-only failures, the same `failed_step` plus the same concrete
   error text) matches an OPEN candidate, AND the top error class matches
-  too -> `action: "comment"`, `confidence: "high"`.
+  too -> `action: "comment"`, `confidence: "high"`. A match may be found in
+  any of the candidate's three evidence lines: its `failure signature` line,
+  its comment, or its body.
 - **Medium** -- same workflow and same `failed_step`, or same top error
   class, but the specific test/error text has drifted, OR the only match
   is a recently-closed candidate -> `action: "comment"` (target the open

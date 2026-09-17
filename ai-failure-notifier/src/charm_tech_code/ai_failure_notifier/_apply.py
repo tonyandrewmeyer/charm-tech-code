@@ -22,20 +22,35 @@ from typing import Any
 from . import _github, _summary
 
 
-def plain_fallback_body(workflow_name: str, run_url: str) -> str:
-    """The plain, generic body text used whenever enrichment is unavailable."""
-    return f"Scheduled workflow '{workflow_name}' failed: {run_url}"
+def plain_fallback_body(workflow_name: str) -> str:
+    """The plain, generic body text used whenever enrichment is unavailable.
+
+    No longer carries the run URL itself: `render_body` puts a `Run:` line under
+    every body it assembles, and having it twice in the fallback was the only
+    place it appeared twice.
+    """
+    return f"Scheduled workflow '{workflow_name}' failed."
 
 
-def render_body(body: str, workflow_name: str, marker: str) -> str:
-    """Assemble an issue or comment body, footer and marker included.
+def render_body(body: str, workflow_name: str, run_url: str, marker: str) -> str:
+    """Assemble an issue or comment body, footer, run link and marker included.
 
     The `Workflow: <name>` footer is what keeps the notifier's coarse search
     working after enrichment has rewritten the title and body: the search
     matches on the workflow name, and without the footer it would depend on
     the model happening to leave the name in the title.
+
+    `Run: <url>` lives with it, and is why `run_url` is a required positional
+    rather than something a caller can forget. For `action: "new"` the
+    enrichment is edited *over* the notifier's placeholder, and the
+    placeholder's entire content was the run link -- so before this, enriching
+    an issue deleted the only pointer to the job that failed. One of the 24
+    bodies the 2026-09-16 harness produced contained a run URL, because the
+    prompt asks for one nowhere and the model volunteers one almost never.
+    Supplying it here instead of in the prompt also means it cannot be
+    hallucinated: it is the URL this run was invoked with.
     """
-    return f'{body.rstrip()}\n\nWorkflow: {workflow_name}\n\n{marker}'
+    return f'{body.rstrip()}\n\nWorkflow: {workflow_name}\nRun: {run_url}\n\n{marker}'
 
 
 def apply_entry(
@@ -43,11 +58,12 @@ def apply_entry(
     entry: dict[str, Any],
     marker: str,
     workflow_name: str,
+    run_url: str,
     *,
     default_target: int | None = None,
 ) -> str:
     """Create or comment on an issue per one envelope entry, stamping `marker`."""
-    body = render_body(entry['body'], workflow_name, marker)
+    body = render_body(entry['body'], workflow_name, run_url, marker)
     if entry['action'] == 'new':
         # The repo's label set is centrally managed, so anything the model
         # asked for that doesn't exist is dropped rather than created.
