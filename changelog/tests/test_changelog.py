@@ -279,8 +279,8 @@ class TestWholeRelease:
         # them reaches the output. Deliberate: dependency bumps, charm-pin
         # updates and the release's own version bump are not changelog
         # material.
-        notes = format_release_notes(categories, self.compare_url, repo=REPO)
-        entry = format_changes(categories, '3.8.2', datetime.date(2026, 8, 31))
+        notes = format_release_notes(categories, self.compare_url)
+        entry = format_changes(categories, '3.8.2', datetime.date(2026, 8, 31), repo=REPO)
         assert 'chore' not in notes.lower()
         assert 'chore' not in entry.lower()
         for pr in OPERATOR_3_8_2_CHORE_PRS:
@@ -288,7 +288,7 @@ class TestWholeRelease:
             assert pr not in entry, f'chore PR #{pr} leaked into the changelog entry'
 
     def test_new_contributors_section_is_dropped(self, categories):
-        notes = format_release_notes(categories, self.compare_url, repo=REPO)
+        notes = format_release_notes(categories, self.compare_url)
         assert 'New Contributors' not in notes
         assert 'made their first contribution' not in notes
 
@@ -303,63 +303,63 @@ class TestWholeRelease:
         # contributor from outside the team went unthanked -- which is the
         # whole of the argument for doing it here.
         assert (
-            format_changes(categories, '3.8.2', datetime.date(2026, 8, 31))
+            format_changes(categories, '3.8.2', datetime.date(2026, 8, 31), repo=REPO)
             == """\
 # 3.8.2 - 31 August 2026
 
 ## Fixes
 
-* Stop the framework mistaking two notices for twins by @ducky-debugger (#2684)
-* Don't put words in an unknown status's mouth (#2700)
+* Stop the framework mistaking two notices for twins by @ducky-debugger (https://github.com/canonical/operator/pull/2684)
+* Don't put words in an unknown status's mouth (https://github.com/canonical/operator/pull/2700)
 
 ## Documentation
 
-* Give each warning a stable :name: anchor to cling to (#2524)
-* Reword the sentences the spell-checker keeps side-eyeing (#2695)
-* Stop dressing cross-references up as quotations (#2666)
-* Make the sample test do something other than pass (#2664)
-* Replace `requests` with `urllib` in the tutorial tests (#2687)
-* Point people at spread without the charmcraft detour (#2706)
-* Move the integration-testing advice into a howto of its own (#2662)
+* Give each warning a stable :name: anchor to cling to (https://github.com/canonical/operator/pull/2524)
+* Reword the sentences the spell-checker keeps side-eyeing (https://github.com/canonical/operator/pull/2695)
+* Stop dressing cross-references up as quotations (https://github.com/canonical/operator/pull/2666)
+* Make the sample test do something other than pass (https://github.com/canonical/operator/pull/2664)
+* Replace `requests` with `urllib` in the tutorial tests (https://github.com/canonical/operator/pull/2687)
+* Point people at spread without the charmcraft detour (https://github.com/canonical/operator/pull/2706)
+* Move the integration-testing advice into a howto of its own (https://github.com/canonical/operator/pull/2662)
 
 ## CI
 
-* Point the DB charm tests at the repo that moved house (#2551)
-* Switch the example charm tests to a `k8s` preset (#2696)
-* Crawl back to the upstream concierge presets (#2699)
+* Point the DB charm tests at the repo that moved house (https://github.com/canonical/operator/pull/2551)
+* Switch the example charm tests to a `k8s` preset (https://github.com/canonical/operator/pull/2696)
+* Crawl back to the upstream concierge presets (https://github.com/canonical/operator/pull/2699)
 
 """
         )
 
     def test_release_notes(self, categories):
         assert (
-            format_release_notes(categories, self.compare_url, repo=REPO)
+            format_release_notes(categories, self.compare_url)
             == """\
 ## What's Changed
 
 ### Fixes
-* Stop the framework mistaking two notices for twins by @ducky-debugger in https://github.com/canonical/operator/pull/2684
-* Don't put words in an unknown status's mouth in https://github.com/canonical/operator/pull/2700
+* Stop the framework mistaking two notices for twins by @ducky-debugger in #2684
+* Don't put words in an unknown status's mouth in #2700
 
 ### Documentation
-* Give each warning a stable :name: anchor to cling to in https://github.com/canonical/operator/pull/2524
-* Reword the sentences the spell-checker keeps side-eyeing in https://github.com/canonical/operator/pull/2695
-* Stop dressing cross-references up as quotations in https://github.com/canonical/operator/pull/2666
-* Make the sample test do something other than pass in https://github.com/canonical/operator/pull/2664
-* Replace `requests` with `urllib` in the tutorial tests in https://github.com/canonical/operator/pull/2687
-* Point people at spread without the charmcraft detour in https://github.com/canonical/operator/pull/2706
-* Move the integration-testing advice into a howto of its own in https://github.com/canonical/operator/pull/2662
+* Give each warning a stable :name: anchor to cling to in #2524
+* Reword the sentences the spell-checker keeps side-eyeing in #2695
+* Stop dressing cross-references up as quotations in #2666
+* Make the sample test do something other than pass in #2664
+* Replace `requests` with `urllib` in the tutorial tests in #2687
+* Point people at spread without the charmcraft detour in #2706
+* Move the integration-testing advice into a howto of its own in #2662
 
 ### CI
-* Point the DB charm tests at the repo that moved house in https://github.com/canonical/operator/pull/2551
-* Switch the example charm tests to a `k8s` preset in https://github.com/canonical/operator/pull/2696
-* Crawl back to the upstream concierge presets in https://github.com/canonical/operator/pull/2699
+* Point the DB charm tests at the repo that moved house in #2551
+* Switch the example charm tests to a `k8s` preset in #2696
+* Crawl back to the upstream concierge presets in #2699
 
 **Full Changelog**: https://github.com/canonical/operator/compare/3.8.1...3.8.2"""
         )
 
     def test_the_date_is_the_one_it_is_given(self, categories):
-        entry = format_changes(categories, '3.8.2', datetime.date(2020, 1, 2))
+        entry = format_changes(categories, '3.8.2', datetime.date(2020, 1, 2), repo=REPO)
         assert entry.startswith('# 3.8.2 - 02 January 2020\n')
 
 
@@ -388,23 +388,23 @@ class TestBreakingChange:
 
     def test_release_notes_put_breaking_first_with_a_warning(self, categories):
         assert (
-            format_release_notes(categories, self.compare_url, repo=REPO)
+            format_release_notes(categories, self.compare_url)
             == """\
 ## What's Changed
 
 ### Breaking Changes
 There are breaking changes in this release. Please review them carefully:
 
-* Refactor: Rehome the otlp-json package inside ops-tracing in https://github.com/canonical/operator/pull/2585
+* Refactor: Rehome the otlp-json package inside ops-tracing in #2585
 
 ### Features
-* Note which socket Pebble was shouting into in https://github.com/canonical/operator/pull/2555
+* Note which socket Pebble was shouting into in #2555
 
 ### Fixes
-* Tear down `Runtime.exec()` when the charm throws a wobbly in https://github.com/canonical/operator/pull/2581
+* Tear down `Runtime.exec()` when the charm throws a wobbly in #2581
 
 ### Refactoring
-* Swap jsonpatch for a dict-diff we can read in https://github.com/canonical/operator/pull/2578
+* Swap jsonpatch for a dict-diff we can read in #2578
 
 **Full Changelog**: https://github.com/canonical/operator/compare/3.7.1...3.8.0"""
         )
@@ -413,25 +413,25 @@ There are breaking changes in this release. Please review them carefully:
         # The warning sentence belongs to the release notes only. A
         # `CHANGES.md` entry is a list, and gets the heading alone.
         assert (
-            format_changes(categories, '3.8.0', datetime.date(2026, 6, 30))
+            format_changes(categories, '3.8.0', datetime.date(2026, 6, 30), repo=REPO)
             == """\
 # 3.8.0 - 30 June 2026
 
 ## Breaking Changes
 
-* Refactor: Rehome the otlp-json package inside ops-tracing (#2585)
+* Refactor: Rehome the otlp-json package inside ops-tracing (https://github.com/canonical/operator/pull/2585)
 
 ## Features
 
-* Note which socket Pebble was shouting into (#2555)
+* Note which socket Pebble was shouting into (https://github.com/canonical/operator/pull/2555)
 
 ## Fixes
 
-* Tear down `Runtime.exec()` when the charm throws a wobbly (#2581)
+* Tear down `Runtime.exec()` when the charm throws a wobbly (https://github.com/canonical/operator/pull/2581)
 
 ## Refactoring
 
-* Swap jsonpatch for a dict-diff we can read (#2578)
+* Swap jsonpatch for a dict-diff we can read (https://github.com/canonical/operator/pull/2578)
 
 """
         )
@@ -442,7 +442,7 @@ class TestFormatReleaseNotes:
         return {category: [] for category in CATEGORIES}
 
     def test_empty_release(self):
-        assert format_release_notes(self.empty(), None, repo=REPO) == "## What's Changed\n"
+        assert format_release_notes(self.empty(), None) == "## What's Changed\n"
 
     def test_categories_render_in_the_declared_order(self):
         categories = self.empty()
@@ -450,7 +450,7 @@ class TestFormatReleaseNotes:
             categories[category] = [Change(f'A {category} change', 1)]
         headings = [
             line
-            for line in format_release_notes(categories, None, repo=REPO).splitlines()
+            for line in format_release_notes(categories, None).splitlines()
             if line.startswith('###')
         ]
         assert headings == ['### Features', '### Fixes', '### CI', '### Reverted']
@@ -458,7 +458,7 @@ class TestFormatReleaseNotes:
     def test_the_compare_url_becomes_the_closing_line(self):
         # The caller passes the link; the prefix is the package's, so that
         # notes rendered here read the same as notes rendered by GitHub.
-        notes = format_release_notes(self.empty(), 'https://example.com/x', repo=REPO)
+        notes = format_release_notes(self.empty(), 'https://example.com/x')
         assert notes.endswith('**Full Changelog**: https://example.com/x')
 
 
@@ -466,10 +466,15 @@ class TestFormatChanges:
     def entry(self, change: Change) -> str:
         categories: dict[str, list[Change]] = {category: [] for category in CATEGORIES}
         categories['fix'] = [change]
-        return format_changes(categories, '1.2.3', datetime.date(2026, 9, 10))
+        return format_changes(categories, '1.2.3', datetime.date(2026, 9, 10), repo=REPO)
 
-    def test_the_pr_number_is_rendered_in_parentheses(self):
-        assert '* A fix (#2684)' in self.entry(Change('A fix', 2684))
+    def test_the_pull_request_url_is_rendered_in_parentheses(self):
+        # The full URL rather than `#2684`: a CHANGES.md is read in an
+        # editor, on PyPI and in the docs as well as on GitHub, and only
+        # GitHub turns `#2684` into a link.
+        assert '* A fix (https://github.com/canonical/operator/pull/2684)' in self.entry(
+            Change('A fix', 2684)
+        )
 
     def test_a_change_with_no_pr_gets_no_reference(self):
         # A commit pushed straight to the branch has no pull request, and is
@@ -480,10 +485,13 @@ class TestFormatChanges:
         assert self.entry(Change('A fix')).endswith('* A fix\n\n')
 
     def test_the_credit_goes_before_the_reference(self):
-        # `* <what> by <who> (#<where>)`, which is the shape operator's own
+        # `* <what> by <who> (<where>)`, which is the shape operator's own
         # hand-written entries use: `* Fix typos in code snippets by
         # @MattiaSarti (#1750)`.
-        assert '* A fix by @someone (#2684)' in self.entry(Change('A fix', 2684, '@someone'))
+        assert (
+            '* A fix by @someone (https://github.com/canonical/operator/pull/2684)'
+            in self.entry(Change('A fix', 2684, '@someone'))
+        )
 
     def test_a_credited_change_with_no_pr_keeps_the_credit(self):
         assert self.entry(Change('A fix', None, 'Bundle Ojoy')).endswith(
@@ -492,13 +500,13 @@ class TestFormatChanges:
 
     def test_empty_release(self):
         empty = {category: [] for category in CATEGORIES}
-        assert format_changes(empty, '1.2.3', datetime.date(2026, 9, 10)) == (
+        assert format_changes(empty, '1.2.3', datetime.date(2026, 9, 10), repo=REPO) == (
             '# 1.2.3 - 10 September 2026\n\n'
         )
 
     def test_the_tag_is_used_verbatim(self):
         empty = {category: [] for category in CATEGORIES}
-        assert format_changes(empty, '3.4.0b1', datetime.date(2026, 9, 10)).startswith(
+        assert format_changes(empty, '3.4.0b1', datetime.date(2026, 9, 10), repo=REPO).startswith(
             '# 3.4.0b1 - '
         )
 
@@ -1041,15 +1049,16 @@ class TestConsoleScript:
         # blank one after the final category. With a compare link at the end
         # there is no trailing blank line, and `_emit` adds one; the
         # release-notes-input case below is that one.
-        assert out == format_release_notes(categories, None, repo=REPO)
-        assert out.endswith('/pull/2699\n')
+        assert out == format_release_notes(categories, None)
+        assert out.endswith('in #2699\n')
 
-    def test_release_notes_needs_a_repo_to_build_links_from(self):
-        # A change carries a number, not a URL, so there is nothing to render
-        # a link out of without this. Failing is better than printing a body
-        # whose every bullet has quietly lost its link.
-        with pytest.raises(SystemExit):
-            self.run_cli('release-notes')
+    def test_release_notes_needs_no_repo(self):
+        # The bullets end in `#N`, which GitHub links for itself, so unlike
+        # `changes-entry` there is nothing here to build out of a repository
+        # name.
+        returncode, out, _ = self.run_cli('release-notes', '--team', TEAM_ARGUMENT)
+        assert returncode == 0
+        assert 'in #2684' in out
 
     def test_release_notes_takes_a_compare_link_it_cannot_work_out(self):
         # A git log has no equivalent of the line GitHub's generated notes
@@ -1066,21 +1075,27 @@ class TestConsoleScript:
     def test_changes_entry_is_the_library_output_byte_for_byte(self):
         categories = parse_git_log(OPERATOR_3_8_2_LOG, team=OPERATOR_TEAM)
         _, out, _ = self.run_cli(
-            'changes-entry', '--tag', '3.8.2', '--date', '2026-08-31', '--team', TEAM_ARGUMENT
+            'changes-entry',
+            '--repo',
+            REPO,
+            '--tag',
+            '3.8.2',
+            '--date',
+            '2026-08-31',
+            '--team',
+            TEAM_ARGUMENT,
         )
         # Including the blank line it ends with: this text is prepended to
         # CHANGES.md verbatim, so the trailing layout is part of the answer.
-        assert out == format_changes(categories, '3.8.2', datetime.date(2026, 8, 31))
-        assert out.endswith('(#2699)\n\n')
+        assert out == format_changes(categories, '3.8.2', datetime.date(2026, 8, 31), repo=REPO)
+        assert out.endswith('(https://github.com/canonical/operator/pull/2699)\n\n')
 
-    def test_changes_entry_needs_no_repo(self):
-        # It renders `(#2684)` and never a URL, so unlike `release-notes` it
-        # has nothing to build out of a repository name.
-        returncode, out, _ = self.run_cli(
-            'changes-entry', '--tag', '3.8.2', '--date', '2026-08-31'
-        )
-        assert returncode == 0
-        assert '(#2684)' in out
+    def test_changes_entry_needs_a_repo_to_build_links_from(self):
+        # A change carries a number, not a URL, so there is nothing to render
+        # a link out of without this. Failing is better than printing an
+        # entry whose every bullet has quietly lost its link.
+        with pytest.raises(SystemExit):
+            self.run_cli('changes-entry', '--tag', '3.8.2')
 
     def test_the_team_is_comma_separated(self):
         # A workflow passes the team as one repository variable with commas
@@ -1091,6 +1106,8 @@ class TestConsoleScript:
         ali = '@ducky-debugger'
         _, out, _ = self.run_cli(
             'changes-entry',
+            '--repo',
+            REPO,
             '--tag',
             '3.8.2',
             '--date',
@@ -1100,7 +1117,10 @@ class TestConsoleScript:
         )
         # Everyone in this range is now accounted for, so the one bullet
         # that was credited no longer is.
-        assert '* Stop the framework mistaking two notices for twins (#2684)' in out
+        assert (
+            '* Stop the framework mistaking two notices for twins '
+            '(https://github.com/canonical/operator/pull/2684)' in out
+        )
         assert '@ducky-debugger' not in out
 
     def test_without_a_team_everyone_is_credited(self):
@@ -1108,19 +1128,21 @@ class TestConsoleScript:
         # and takes one edit, while crediting nobody is invisible. Note that
         # Pebble Beachcomber is credited by *name* here: they commit from an
         # @canonical.com address, so the git log has no handle for them.
-        _, out, _ = self.run_cli('changes-entry', '--tag', '3.8.2', '--date', '2026-08-31')
-        assert (
-            '* Stop the framework mistaking two notices for twins by @ducky-debugger (#2684)'
-            in out
+        _, out, _ = self.run_cli(
+            'changes-entry', '--repo', REPO, '--tag', '3.8.2', '--date', '2026-08-31'
         )
         assert (
-            '* Stop dressing cross-references up as quotations by Pebble Beachcomber (#2666)'
-            in out
+            '* Stop the framework mistaking two notices for twins by @ducky-debugger '
+            '(https://github.com/canonical/operator/pull/2684)' in out
+        )
+        assert (
+            '* Stop dressing cross-references up as quotations by Pebble Beachcomber '
+            '(https://github.com/canonical/operator/pull/2666)' in out
         )
 
     def test_changes_entry_defaults_to_today(self):
         with mock.patch.object(_cli, '_today', return_value=datetime.date(2026, 9, 11)):
-            _, out, _ = self.run_cli('changes-entry', '--tag', '3.8.2')
+            _, out, _ = self.run_cli('changes-entry', '--repo', REPO, '--tag', '3.8.2')
         assert out.startswith('# 3.8.2 - 11 September 2026\n')
 
     def test_git_log_format_prints_the_format_and_reads_nothing(self):
@@ -1138,7 +1160,7 @@ class TestConsoleScript:
 
     def test_an_unparseable_date_is_rejected(self):
         with pytest.raises(SystemExit):
-            self.run_cli('changes-entry', '--tag', '3.8.2', '--date', 'yesterday')
+            self.run_cli('changes-entry', '--repo', REPO, '--tag', '3.8.2', '--date', 'yesterday')
 
     def test_a_subcommand_is_required(self):
         with pytest.raises(SystemExit):

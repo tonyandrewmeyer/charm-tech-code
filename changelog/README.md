@@ -22,18 +22,18 @@ become one `CHANGES.md` entry:
 
 ## Fixes
 
-* Stop the framework mistaking two notices for twins by @ducky-debugger (#2684)
+* Stop the framework mistaking two notices for twins by @ducky-debugger (https://github.com/canonical/operator/pull/2684)
 
 ## Documentation
 
-* Stop dressing cross-references up as quotations (#2666)
+* Stop dressing cross-references up as quotations (https://github.com/canonical/operator/pull/2666)
 
 ## CI
 
-* Crawl back to the upstream concierge presets (#2699)
+* Crawl back to the upstream concierge presets (https://github.com/canonical/operator/pull/2699)
 ```
 
-Release notes are the same content with `###` headings and full pull-request URLs in place of `(#N)`.
+Release notes are the same content with `###` headings and `in #2684` in place of the parenthesised URL. The short form is GitHub's own: a release body renders `#2684` as a link to the pull request, where a `CHANGES.md` is read in an editor, on PyPI and in the docs as well, and only GitHub would make a link of it.
 
 Most of the rules are visible there:
 
@@ -47,7 +47,7 @@ And the rules it doesn't show:
 * **A `!` means breaking.** The entry moves to a `Breaking Changes` section that renders first, keeping its real type as a prefix, under a sentence asking the reader to review carefully. It does not infer a *major* bump: a breaking change riding in a minor release is a bend of the rules we have decided to allow, and that call-out is what the bend relies on.
 * **A revert of something in the same range cancels with it**, and neither appears. A revert of something already released goes under `Reverted` - except a revert of a released `feat`, or of anything carrying a `!`, which goes to `Breaking Changes`, because taking away behaviour people rely on is a breaking change whatever the revert's own type says. The pairing key is the `Reverts owner/repo#N` line rather than a SHA, which squash merging makes meaningless.
 * **Anything unplaceable is surfaced rather than dropped.** A commit type that is neither a category nor `chore`, and a subject that is not conventional at all, land under `Uncategorised` with the type kept, so that a human fixes them while reading the draft instead of finding out afterwards.
-* **A commit with no `(#N)`** - one pushed straight to the branch - renders with no reference rather than a `(#?)` standing in for one.
+* **A commit with no `(#N)` in its subject** - one pushed straight to the branch - renders with no reference rather than a placeholder standing in for one.
 
 ## Using it
 
@@ -59,7 +59,7 @@ SIZE=$(changelog bump-size --team "$TEAM" < log.txt)
 VERSION=$(changelog next-version --previous "$LAST_TAG" --team "$TEAM" < log.txt)
 changelog release-notes --repo "$REPO" --team "$TEAM" \
     --compare-url "https://github.com/$REPO/compare/$LAST_TAG...$VERSION" < log.txt > release-notes.md
-changelog changes-entry --tag "$VERSION" --team "$TEAM" < log.txt > changes-entry.md
+changelog changes-entry --repo "$REPO" --tag "$VERSION" --team "$TEAM" < log.txt > changes-entry.md
 ```
 
 The two commands that print one word are for `$GITHUB_OUTPUT`; the two that print Markdown are for redirecting into a file, because a `$GITHUB_OUTPUT` line only takes a multi-line document through a heredoc delimiter the document must not itself contain. `git-log-format` prints the `--format` string the others expect, so the separators live in one place rather than in every workflow - copy them and it works until someone drops one, at which point the log stops parsing and the release goes out with an empty changelog rather than an error.

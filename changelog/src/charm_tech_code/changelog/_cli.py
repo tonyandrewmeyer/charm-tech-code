@@ -86,9 +86,11 @@ def _repo_option(parser: argparse.ArgumentParser, *, required: bool) -> None:
         required=required,
         metavar='OWNER/NAME',
         help=(
-            'The repository the pull-request links point into. A change '
-            'carries a number rather than a URL -- a number is all a git log '
-            'has -- so the links are built from this.'
+            'The repository this log came from. A change carries a pull '
+            'request number rather than a URL -- a number is all a git log '
+            'has -- so the links in a CHANGES.md entry are built from this. '
+            'It also tells a `Reverts` line naming another repository apart '
+            'from one naming this one.'
         ),
     )
 
@@ -108,7 +110,8 @@ def _build_parser() -> argparse.ArgumentParser:
               SIZE=$(changelog bump-size --team "$TEAM" < log.txt)
               VERSION=$(changelog next-version --previous "$LAST_TAG" --team "$TEAM" < log.txt)
               changelog release-notes --repo "$REPO" --team "$TEAM" < log.txt > release-notes.md
-              changelog changes-entry --tag "$VERSION" --team "$TEAM" < log.txt > changes-entry.md
+              changelog changes-entry --repo "$REPO" --tag "$VERSION" --team "$TEAM" \\
+                  < log.txt > changes-entry.md
         """),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -156,7 +159,7 @@ def _build_parser() -> argparse.ArgumentParser:
             'one to print.'
         ),
     )
-    _repo_option(release_notes_parser, required=True)
+    _repo_option(release_notes_parser, required=False)
     release_notes_parser.add_argument(
         '--compare-url',
         default=None,
@@ -177,7 +180,7 @@ def _build_parser() -> argparse.ArgumentParser:
             'to the existing file.'
         ),
     )
-    _repo_option(changes_entry_parser, required=False)
+    _repo_option(changes_entry_parser, required=True)
     changes_entry_parser.add_argument(
         '--tag',
         required=True,
@@ -234,9 +237,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f'changelog: {exc}', file=sys.stderr)
             return 2
     elif args.command == 'release-notes':
-        _emit(format_release_notes(categories, args.compare_url, repo=args.repo))
+        _emit(format_release_notes(categories, args.compare_url))
     else:
-        _emit(format_changes(categories, args.tag, args.date or _today()))
+        _emit(format_changes(categories, args.tag, args.date or _today(), repo=args.repo))
 
     return 0
 
