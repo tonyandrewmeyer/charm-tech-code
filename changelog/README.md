@@ -37,16 +37,16 @@ Release notes are the same content with `###` headings and `in #2684` in place o
 
 Most of the rules are visible there:
 
-* **A contributor from outside the maintaining team is credited; a maintainer is not.** Pass the team to `--team`, comma-separated, as emails and/or handles. **An empty team credits everyone**: over-crediting is visible in the draft release and takes one edit, while crediting nobody is invisible until a contributor notices.
+* **A contributor from outside the maintaining team is credited; a maintainer is not.** Pass the team to `--team`, comma-separated, as emails and/or handles; an empty team credits everyone, which is the safe way round, since over-crediting is visible in the draft release and crediting nobody is not.
 * **A handle is only sometimes recoverable.** `46688206+ducky-debugger@users.noreply.github.com` gives `@ducky-debugger`, GitHub's default for an account with a private email; where the log has no handle, the person is credited by name.
 * **`chore` is dropped on purpose.** Dependency bumps, charm pins and the release's own version bump are not what a reader came for, and `git log` still has them.
-* **The headings, their order and the commit-type map are fixed.** The format is common across our repositories and the type set is enforced by a shared PR-title check, so there is nothing for an adopting repository to supply.
+* **The headings, their order and the commit-type map are fixed.** The format is common across our repositories, so there is nothing for an adopting repository to supply.
 
 And the rules it doesn't show:
 
-* **A `!` means breaking.** The entry moves to a `Breaking Changes` section that renders first, keeping its real type as a prefix, under a sentence asking the reader to review carefully. It does not infer a *major* bump: a breaking change riding in a minor release is a bend of the rules we have decided to allow, and that call-out is what the bend relies on.
-* **A revert of something in the same range cancels with it**, and neither appears. A revert of something already released goes under `Reverted` - except a revert of a released `feat`, or of anything carrying a `!`, which goes to `Breaking Changes`, because taking away behaviour people rely on is a breaking change whatever the revert's own type says. The pairing key is the `Reverts owner/repo#N` line rather than a SHA, which squash merging makes meaningless.
-* **Anything unplaceable is surfaced rather than dropped.** A commit type that is neither a category nor `chore`, and a subject that is not conventional at all, land under `Uncategorised` with the type kept, so that a human fixes them while reading the draft instead of finding out afterwards.
+* **A `!` means breaking.** The entry moves to a `Breaking Changes` section that renders first, keeping its real type as a prefix and carrying a sentence asking the reader to review carefully; it does not infer a *major* bump.
+* **A revert of something in the same range cancels with it**, and neither appears; a revert of something already released goes under `Reverted`, or under `Breaking Changes` where it undoes a released `feat` or anything carrying a `!`.
+* **Anything unplaceable is surfaced rather than dropped.** An unrecognised commit type, or a subject that is not conventional at all, lands under `Uncategorised` with the type kept, for a human to fix while reading the draft.
 * **A commit with no `(#N)` in its subject** - one pushed straight to the branch - renders with no reference rather than a placeholder standing in for one.
 
 ## Using it
