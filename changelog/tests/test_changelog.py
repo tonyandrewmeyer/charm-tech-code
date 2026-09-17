@@ -69,16 +69,16 @@ from charm_tech_code.changelog._version import MINOR, PATCH, infer_bump_size, ne
 # every bot commit in the fixtures is a `chore` and dropped before it could
 # be credited.
 OPERATOR_TEAM = (
-    '@pebble-beachcomber',
-    '@harness-hardy',
-    '@juju-jones',
-    '@relation-ray',
-    '@secret-squirrelly',
-    '@storage-steve',
-    'pebble.beachcomber@canonical.com',
-    'harness.hardy@canonical.com',
-    'juju.jones@canonical.com',
-    'relation.ray@canonical.com',
+    '@focal-fossa',
+    '@precise-pangolin',
+    '@trusty-tahr',
+    '@hardy-heron',
+    '@warty-warthog',
+    '@maverick-meerkat',
+    'focal.fossa@canonical.com',
+    'precise.pangolin@canonical.com',
+    'trusty.tahr@canonical.com',
+    'hardy.heron@canonical.com',
     'charm.tech+prints-charming-bot@canonical.com',
     '49699333+charm-tech-testbot[bot]@users.noreply.github.com',
 )
@@ -87,9 +87,9 @@ OPERATOR_TEAM = (
 #: pull-request links are built against.
 REPO = 'canonical/operator'
 
-PEBBLE = ('Pebble Beachcomber', 'pebble.beachcomber@canonical.com')
-HARNESS = ('Harness Hardy', 'harness.hardy@canonical.com')
-JUJU = ('Juju Jones', 'juju.jones@canonical.com')
+FOCAL = ('Focal Fossa', 'focal.fossa@canonical.com')
+PRECISE = ('Precise Pangolin', 'precise.pangolin@canonical.com')
+TRUSTY = ('Trusty Tahr', 'trusty.tahr@canonical.com')
 CHARMBOT = ('charm-tech-testbot[bot]', '49699333+charm-tech-testbot[bot]@users.noreply.github.com')
 PRINTS_CHARMING = ('Prints Charming', 'charm.tech+prints-charming-bot@canonical.com')
 # Three shapes of contributor from outside the team, all observed in
@@ -122,14 +122,14 @@ def git_log(*commits: tuple[tuple[str, str], str, str]) -> str:
 # Eleven of these are `chore` and must not reach either output, which is what
 # `OPERATOR_3_8_2_CHORE_PRS` below is for.
 OPERATOR_3_8_2_COMMITS = (
-    (PEBBLE, 'chore: adjust versions after release (#2670)', ''),
-    (PEBBLE, 'docs: give each warning a stable :name: anchor to cling to (#2524)', ''),
-    (PEBBLE, 'ci: point the DB charm tests at the repo that moved house (#2551)', ''),
+    (FOCAL, 'chore: adjust versions after release (#2670)', ''),
+    (FOCAL, 'docs: give each warning a stable :name: anchor to cling to (#2524)', ''),
+    (FOCAL, 'ci: point the DB charm tests at the repo that moved house (#2551)', ''),
     (CHARMBOT, 'chore: bump cryptography from 48.0.1 to 50.0.0 (#2682)', ''),
     (DUCKY, 'fix: stop the framework mistaking two notices for twins (#2684)', ''),
     (CHARMBOT, 'chore: bump the actions group across 1 directory with 8 updates (#2674)', ''),
     (CHARMBOT, 'chore: bump the runtime group across 1 directory with 4 updates (#2691)', ''),
-    (PEBBLE, 'docs: reword the sentences the spell-checker keeps side-eyeing (#2695)', ''),
+    (FOCAL, 'docs: reword the sentences the spell-checker keeps side-eyeing (#2695)', ''),
     (PRINTS_CHARMING, 'chore: update charm pins (#2582)', ''),
     (
         CHARMBOT,
@@ -137,26 +137,26 @@ OPERATOR_3_8_2_COMMITS = (
         '',
     ),
     (CHARMBOT, 'chore: bump the charm-tech group across 1 directory with 3 updates (#2697)', ''),
-    (PEBBLE, 'docs: stop dressing cross-references up as quotations (#2666)', ''),
-    (HARNESS, 'ci: switch the example charm tests to a `k8s` preset (#2696)', ''),
+    (FOCAL, 'docs: stop dressing cross-references up as quotations (#2666)', ''),
+    (PRECISE, 'ci: switch the example charm tests to a `k8s` preset (#2696)', ''),
     (
-        PEBBLE,
+        FOCAL,
         'docs: make the sample test do something other than pass (#2664)',
         '',
     ),
-    (PEBBLE, 'ci: crawl back to the upstream concierge presets (#2699)', ''),
+    (FOCAL, 'ci: crawl back to the upstream concierge presets (#2699)', ''),
     (
-        HARNESS,
+        PRECISE,
         'docs: replace `requests` with `urllib` in the tutorial tests (#2687)',
         '',
     ),
-    (PEBBLE, "fix: don't put words in an unknown status's mouth (#2700)", ''),
+    (FOCAL, "fix: don't put words in an unknown status's mouth (#2700)", ''),
     (CHARMBOT, 'chore: bump the dev-tooling group with 4 updates (#2676)', ''),
     (PRINTS_CHARMING, 'chore: update charm pins (#2701)', ''),
-    (PEBBLE, "chore: adopt ruff 0.16's new lint conventions (#2698)", ''),
-    (PEBBLE, 'docs: point people at spread without the charmcraft detour (#2706)', ''),
-    (JUJU, 'docs: move the integration-testing advice into a howto of its own (#2662)', ''),
-    (HARNESS, 'chore: update changelog and versions for 3.8.2 release (#2716)', ''),
+    (FOCAL, "chore: adopt ruff 0.16's new lint conventions (#2698)", ''),
+    (FOCAL, 'docs: point people at spread without the charmcraft detour (#2706)', ''),
+    (TRUSTY, 'docs: move the integration-testing advice into a howto of its own (#2662)', ''),
+    (PRECISE, 'chore: update changelog and versions for 3.8.2 release (#2716)', ''),
 )
 
 # The PR numbers of the eleven `chore` pull requests in that release. None of
@@ -180,14 +180,14 @@ OPERATOR_3_8_2_CHORE_PRS = (
 # carry a breaking change: a `refactor!`, and three ordinary entries for it
 # to be sorted ahead of.
 OPERATOR_BREAKING_COMMITS = (
-    (PEBBLE, 'refactor: swap jsonpatch for a dict-diff we can read (#2578)', ''),
+    (FOCAL, 'refactor: swap jsonpatch for a dict-diff we can read (#2578)', ''),
     (
-        PEBBLE,
+        FOCAL,
         'refactor!: rehome the otlp-json package inside ops-tracing (#2585)',
         '',
     ),
-    (PEBBLE, 'feat: note which socket Pebble was shouting into (#2555)', ''),
-    (PEBBLE, 'fix: tear down `Runtime.exec()` when the charm throws a wobbly (#2581)', ''),
+    (FOCAL, 'feat: note which socket Pebble was shouting into (#2555)', ''),
+    (FOCAL, 'fix: tear down `Runtime.exec()` when the charm throws a wobbly (#2581)', ''),
 )
 
 # Six commits from the 3.7.1..3.8.0 range, in merge order, chosen for what
@@ -202,10 +202,10 @@ OPERATOR_BREAKING_COMMITS = (
 OPERATOR_REVERT_RANGE_COMMITS = (
     (SIDECAR, 'fix: treat remote unit zero as a real unit (#2454)', ''),
     (BUNDLE, 'docs: tidy the small snags in the K8s tutorial (#2540)', ''),
-    (PEBBLE, 'docs: link to the Ubuntu Code of Conduct instead of copying it (#2564)', ''),
+    (FOCAL, 'docs: link to the Ubuntu Code of Conduct instead of copying it (#2564)', ''),
     (CHARMBOT, 'chore: bump opentelemetry-api from 1.37.0 to 1.42.1 (#2538)', ''),
     (
-        PEBBLE,
+        FOCAL,
         'revert: "chore: bump opentelemetry-api from 1.37.0 to 1.42.1" (#2568)',
         'Reverts canonical/operator#2538\n\nTriggers warnings on 3.10.\n',
     ),
@@ -550,7 +550,7 @@ OPERATOR_CHORE_ONLY_LOG = git_log(
 # The rest of the 3.7.1..3.8.0 range is what makes that release obviously a
 # minor one; without it, the `!` has to carry the decision alone.
 OPERATOR_BREAKING_ONLY_LOG = git_log((
-    PEBBLE,
+    FOCAL,
     'refactor!: rehome the otlp-json package inside ops-tracing (#2585)',
     '',
 ))
@@ -589,7 +589,7 @@ class TestBumpSize:
         # empty `feat` list. A rule that read `feat` alone would call this a
         # patch. operator has not merged a `feat!` into a 3.x release, so this
         # commit is made up rather than lifted.
-        categories = categories_of(git_log((PEBBLE, 'feat!: replace the framework API (#1)', '')))
+        categories = categories_of(git_log((FOCAL, 'feat!: replace the framework API (#1)', '')))
         assert categories['feat'] == []
         assert infer_bump_size(categories) == MINOR
 
@@ -693,30 +693,29 @@ class TestGitLogParse:
         # The `(#N)` a squash merge appends, and the only thing the git log
         # says about the pull request. Over operator's last 300 commits every
         # subject has one.
-        categories = self.parse((PEBBLE, 'fix: polish the runes (#1234)', ''))
+        categories = self.parse((FOCAL, 'fix: polish the runes (#1234)', ''))
         assert categories['fix'] == [Change('Polish the runes', 1234)]
 
     def test_a_commit_with_no_pr_number_carries_none(self):
         # A commit pushed straight to the branch. operator has these, from
-        # before the squash-merge policy -- `chore: remove odd argument to
-        # "raise NotImplementedError" in harness.py` is one, by Ben, with no
-        # suffix. The change is real, so it is carried with nothing in the
+        # before the squash-merge policy: a subject with no `(#N)` suffix at
+        # all. The change is real, so it is carried with nothing in the
         # number rather than with a placeholder that reads like a bug.
-        categories = self.parse((PEBBLE, 'fix: polish the runes', ''))
+        categories = self.parse((FOCAL, 'fix: polish the runes', ''))
         assert categories['fix'] == [Change('Polish the runes', None)]
 
     def test_a_number_that_is_not_the_suffix_is_not_the_pr(self):
         # Only a trailing `(#N)` counts, so a summary that happens to mention
         # an issue does not get mistaken for one.
-        categories = self.parse((PEBBLE, 'fix: handle (#5) style input properly (#1234)', ''))
+        categories = self.parse((FOCAL, 'fix: handle (#5) style input properly (#1234)', ''))
         assert categories['fix'] == [Change('Handle (#5) style input properly', 1234)]
 
     def test_chore_is_dropped_here_too(self):
-        categories = self.parse((PEBBLE, 'chore: bump a dependency (#1)', ''))
+        categories = self.parse((FOCAL, 'chore: bump a dependency (#1)', ''))
         assert all(not items for items in categories.values())
 
     def test_a_breaking_commit_moves_to_breaking_with_its_type_kept(self):
-        categories = self.parse((PEBBLE, 'refactor!: move the kettle (#2585)', ''))
+        categories = self.parse((FOCAL, 'refactor!: move the kettle (#2585)', ''))
         assert categories['breaking'] == [Change('Refactor: Move the kettle', 2585)]
         assert categories['refactor'] == []
 
@@ -724,17 +723,17 @@ class TestGitLogParse:
         # `canonical/pebble` scopes most of its dependency bumps and a good
         # deal else, so this is a real shape and not a hypothetical one. The
         # scope does not reach the entry: see `COMMIT_SUBJECT_REGEX`.
-        categories = self.parse((PEBBLE, 'fix(reaper): polish the runes (#1)', ''))
+        categories = self.parse((FOCAL, 'fix(reaper): polish the runes (#1)', ''))
         assert categories['fix'] == [Change('Polish the runes', 1)]
 
     def test_a_comma_separated_scope_is_one_scope(self):
         # `fix(cmdstate,wsutil):` is a real pebble subject, and the shape most
         # likely to be read as two groups by a regex written for one.
-        categories = self.parse((PEBBLE, 'fix(cmdstate,wsutil): polish the runes (#1)', ''))
+        categories = self.parse((FOCAL, 'fix(cmdstate,wsutil): polish the runes (#1)', ''))
         assert categories['fix'] == [Change('Polish the runes', 1)]
 
     def test_a_breaking_scoped_commit_is_still_breaking(self):
-        categories = self.parse((PEBBLE, 'feat(api)!: replace it (#1)', ''))
+        categories = self.parse((FOCAL, 'feat(api)!: replace it (#1)', ''))
         assert categories['breaking'] == [Change('Feat: Replace it', 1)]
 
     def test_a_subject_that_is_not_conventional_is_uncategorised(self):
@@ -743,9 +742,9 @@ class TestGitLogParse:
         # no invented type, so that the human reading the draft can place
         # them. `--no-merges` is now worth more than a recommendation.
         categories = self.parse(
-            (PEBBLE, "Merge remote-tracking branch 'source/main' into import-ops-scenario", ''),
-            (PEBBLE, 'Reorganise the scenario files.', ''),
-            (PEBBLE, 'fix: a genuine bug (#1)', ''),
+            (FOCAL, "Merge remote-tracking branch 'source/main' into import-ops-scenario", ''),
+            (FOCAL, 'Reorganise the scenario files.', ''),
+            (FOCAL, 'fix: a genuine bug (#1)', ''),
         )
         assert categories['fix'] == [Change('A genuine bug', 1)]
         assert categories['unknown'] == [
@@ -759,8 +758,8 @@ class TestGitLogParse:
         # surprise: either a typo or a repository without the PR-title check.
         # The type is kept, because it is the thing that has to be fixed.
         categories = self.parse(
-            (PEBBLE, 'style: reflow the docstrings (#1)', ''),
-            (PEBBLE, 'fixs: a typo in the type (#2)', ''),
+            (FOCAL, 'style: reflow the docstrings (#1)', ''),
+            (FOCAL, 'fixs: a typo in the type (#2)', ''),
         )
         assert categories['unknown'] == [
             Change('Style: Reflow the docstrings', 1),
@@ -771,8 +770,8 @@ class TestGitLogParse:
         # `chore` is a real type that is deliberately not rendered, which is
         # what distinguishes it from the unrecognised ones above.
         categories = self.parse(
-            (PEBBLE, 'chore: bump the dependencies (#1)', ''),
-            (PEBBLE, 'fix: a genuine bug (#2)', ''),
+            (FOCAL, 'chore: bump the dependencies (#1)', ''),
+            (FOCAL, 'fix: a genuine bug (#2)', ''),
         )
         assert categories['unknown'] == []
         assert sum(len(items) for items in categories.values()) == 1
@@ -782,8 +781,8 @@ class TestGitLogParse:
         # arbitrary text with blank lines in it, so anything line-oriented
         # would lose track of where the next commit starts.
         categories = self.parse(
-            (PEBBLE, 'fix: the first (#1)', 'A body.\n\nWith a blank line.\n\n* And a bullet.\n'),
-            (PEBBLE, 'fix: the second (#2)', ''),
+            (FOCAL, 'fix: the first (#1)', 'A body.\n\nWith a blank line.\n\n* And a bullet.\n'),
+            (FOCAL, 'fix: the second (#2)', ''),
         )
         assert categories['fix'] == [Change('The first', 1), Change('The second', 2)]
 
@@ -793,7 +792,7 @@ class TestGitLogParse:
     def test_trailing_whitespace_between_records_is_tolerated(self):
         # `git log` output arrives with a newline on the end of it.
         categories = parse_git_log(
-            git_log((PEBBLE, 'fix: polish the runes (#1)', '')) + '\n', team=OPERATOR_TEAM
+            git_log((FOCAL, 'fix: polish the runes (#1)', '')) + '\n', team=OPERATOR_TEAM
         )
         assert categories['fix'] == [Change('Polish the runes', 1)]
 
@@ -807,7 +806,7 @@ class TestAuthorCredit:
     def test_a_team_member_is_not_credited(self):
         # By email, which is all a git log gives for someone who commits
         # under a real address.
-        assert self.parse(PEBBLE) == [Change('Polish the runes', 1)]
+        assert self.parse(FOCAL) == [Change('Polish the runes', 1)]
 
     def test_an_outside_contributor_is_credited_by_handle(self):
         # `46688206+ducky-debugger@users.noreply.github.com` -> `@ducky-debugger`. This is
@@ -840,31 +839,31 @@ class TestAuthorCredit:
         # on the handle the email yields, so a team list of handles alone
         # still works.
         assert self.parse(
-            ('Pebble Beachcomber', '12345+pebble-beachcomber@users.noreply.github.com'),
-            team=('@pebble-beachcomber',),
+            ('Focal Fossa', '12345+focal-fossa@users.noreply.github.com'),
+            team=('@focal-fossa',),
         ) == [Change('Polish the runes', 1)]
 
     def test_matching_ignores_case_and_a_leading_at(self):
-        for member in ('PEBBLE.BEACHCOMBER@CANONICAL.COM', 'pebble.beachcomber@canonical.com'):
-            assert self.parse(PEBBLE, team=(member,)) == [Change('Polish the runes', 1)], member
-        no_reply = ('Pebble Beachcomber', '12345+pebble-beachcomber@users.noreply.github.com')
-        for member in ('@PEBBLE-BEACHCOMBER', 'pebble-beachcomber', '@pebble-beachcomber'):
+        for member in ('FOCAL.FOSSA@CANONICAL.COM', 'focal.fossa@canonical.com'):
+            assert self.parse(FOCAL, team=(member,)) == [Change('Polish the runes', 1)], member
+        no_reply = ('Focal Fossa', '12345+focal-fossa@users.noreply.github.com')
+        for member in ('@FOCAL-FOSSA', 'focal-fossa', '@focal-fossa'):
             assert self.parse(no_reply, team=(member,)) == [Change('Polish the runes', 1)], member
 
     def test_a_handle_in_the_team_does_not_match_an_author_who_has_no_handle(self):
         # Not a bug, and worth pinning: nothing in a git log connects
-        # `pebble.beachcomber@canonical.com` to `@pebble-beachcomber`. A team list of
+        # `focal.fossa@canonical.com` to `@focal-fossa`. A team list of
         # handles alone covers only the members who commit from a GitHub
         # no-reply address, which is why `OPERATOR_TEAM` carries both.
-        assert self.parse(PEBBLE, team=('@pebble-beachcomber',)) == [
-            Change('Polish the runes', 1, 'Pebble Beachcomber')
+        assert self.parse(FOCAL, team=('@focal-fossa',)) == [
+            Change('Polish the runes', 1, 'Focal Fossa')
         ]
 
     def test_an_empty_team_credits_everyone(self):
         # The safe failure. A repository that has not said who maintains it
         # over-credits, which is visible in the draft release and takes one
         # edit; the other way round, a contributor is silently left out.
-        assert self.parse(PEBBLE, team=()) == [Change('Polish the runes', 1, 'Pebble Beachcomber')]
+        assert self.parse(FOCAL, team=()) == [Change('Polish the runes', 1, 'Focal Fossa')]
 
 
 class TestRevert:
@@ -907,9 +906,9 @@ class TestRevert:
         # reader is concerned, so listing either half would be describing
         # something that never reached anyone.
         categories = self.parse(
-            (PEBBLE, 'fix: polish the runes (#100)', ''),
-            (PEBBLE, 'fix: polish the other runes (#101)', ''),
-            (PEBBLE, 'revert: "fix: polish the runes" (#102)', 'Reverts canonical/operator#100\n'),
+            (FOCAL, 'fix: polish the runes (#100)', ''),
+            (FOCAL, 'fix: polish the other runes (#101)', ''),
+            (FOCAL, 'revert: "fix: polish the runes" (#102)', 'Reverts canonical/operator#100\n'),
         )
         assert categories['fix'] == [Change('Polish the other runes', 101)]
         assert categories['revert'] == []
@@ -921,14 +920,14 @@ class TestRevert:
         # `Reverted` heading rather than being filed under the `fix` it
         # undoes, which would read as a new fix rather than as a removal.
         categories = self.parse(
-            (PEBBLE, 'revert: "fix: polish the runes" (#102)', 'Reverts canonical/operator#99\n'),
+            (FOCAL, 'revert: "fix: polish the runes" (#102)', 'Reverts canonical/operator#99\n'),
         )
         assert categories['revert'] == [Change('"fix: polish the runes"', 102)]
         assert categories['fix'] == []
 
     def test_a_revert_of_something_released_is_at_least_a_patch(self):
         categories = self.parse(
-            (PEBBLE, 'revert: "fix: polish the runes" (#102)', 'Reverts canonical/operator#99\n'),
+            (FOCAL, 'revert: "fix: polish the runes" (#102)', 'Reverts canonical/operator#99\n'),
         )
         assert infer_bump_size(categories) == PATCH
 
@@ -940,7 +939,7 @@ class TestRevert:
         # `MINOR_BUMP_CATEGORIES` -- a minor bump rather than a patch.
         categories = self.parse(
             (
-                PEBBLE,
+                FOCAL,
                 'revert: "feat: add a second kettle" (#102)',
                 'Reverts canonical/operator#99\n',
             ),
@@ -951,7 +950,7 @@ class TestRevert:
 
     def test_a_revert_of_a_released_breaking_change_is_breaking(self):
         categories = self.parse(
-            (PEBBLE, 'revert: "refactor!: move it" (#102)', 'Reverts canonical/operator#99\n'),
+            (FOCAL, 'revert: "refactor!: move it" (#102)', 'Reverts canonical/operator#99\n'),
         )
         assert categories['breaking'] == [Change('Revert: "refactor!: move it"', 102)]
 
@@ -959,9 +958,9 @@ class TestRevert:
         # The cancelling comes first: a feature that never shipped cannot be
         # a breaking removal of anything.
         categories = self.parse(
-            (PEBBLE, 'feat: add a second kettle (#99)', ''),
+            (FOCAL, 'feat: add a second kettle (#99)', ''),
             (
-                PEBBLE,
+                FOCAL,
                 'revert: "feat: add a second kettle" (#102)',
                 'Reverts canonical/operator#99\n',
             ),
@@ -974,8 +973,8 @@ class TestRevert:
         # GitHub's Revert button writes `Reverts owner/repo#N`, but a
         # hand-written revert often leaves the owner/repo off.
         categories = self.parse(
-            (PEBBLE, 'fix: polish the runes (#100)', ''),
-            (PEBBLE, 'revert: "fix: polish the runes" (#102)', 'Reverts #100\n'),
+            (FOCAL, 'fix: polish the runes (#100)', ''),
+            (FOCAL, 'revert: "fix: polish the runes" (#102)', 'Reverts #100\n'),
         )
         assert categories['fix'] == []
         assert categories['revert'] == []
@@ -984,8 +983,8 @@ class TestRevert:
         # Otherwise `Reverts some/other#100` would cancel this repository's
         # #100, which has nothing to do with it.
         categories = self.parse(
-            (PEBBLE, 'fix: polish the runes (#100)', ''),
-            (PEBBLE, 'revert: "fix: something else" (#102)', 'Reverts some/other#100\n'),
+            (FOCAL, 'fix: polish the runes (#100)', ''),
+            (FOCAL, 'revert: "fix: something else" (#102)', 'Reverts some/other#100\n'),
         )
         assert categories['fix'] == [Change('Polish the runes', 100)]
         assert categories['revert'] == [Change('"fix: something else"', 102)]
@@ -994,7 +993,7 @@ class TestRevert:
         # Nothing says what it undoes, so there is nothing to cancel it
         # against. Showing it is the safe answer: the alternative is hiding a
         # change that shipped.
-        categories = self.parse((PEBBLE, 'revert: "fix: polish the runes" (#102)', 'No idea.\n'))
+        categories = self.parse((FOCAL, 'revert: "fix: polish the runes" (#102)', 'No idea.\n'))
         assert categories['revert'] == [Change('"fix: polish the runes"', 102)]
 
     def test_a_revert_of_a_chore_is_still_dropped_when_called_out(self):
@@ -1004,7 +1003,7 @@ class TestRevert:
         # worth reporting, because the reader is being told about the removal
         # rather than about the original.
         categories = self.parse(
-            (PEBBLE, 'revert: "chore: bump it" (#102)', 'Reverts canonical/operator#99\n'),
+            (FOCAL, 'revert: "chore: bump it" (#102)', 'Reverts canonical/operator#99\n'),
         )
         assert categories['revert'] == [Change('"chore: bump it"', 102)]
 
@@ -1126,7 +1125,7 @@ class TestConsoleScript:
     def test_without_a_team_everyone_is_credited(self):
         # The safe way round: over-crediting shows up in the draft release
         # and takes one edit, while crediting nobody is invisible. Note that
-        # Pebble Beachcomber is credited by *name* here: they commit from an
+        # Focal Fossa is credited by *name* here: they commit from an
         # @canonical.com address, so the git log has no handle for them.
         _, out, _ = self.run_cli(
             'changes-entry', '--repo', REPO, '--tag', '3.8.2', '--date', '2026-08-31'
@@ -1136,7 +1135,7 @@ class TestConsoleScript:
             '(https://github.com/canonical/operator/pull/2684)' in out
         )
         assert (
-            '* Stop dressing cross-references up as quotations by Pebble Beachcomber '
+            '* Stop dressing cross-references up as quotations by Focal Fossa '
             '(https://github.com/canonical/operator/pull/2666)' in out
         )
 
