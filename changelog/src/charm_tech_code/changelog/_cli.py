@@ -15,13 +15,9 @@
 
 """The console script: a range of changes on stdin, one answer on stdout.
 
-**This module is the package's I/O boundary, and the only one.** Everything
-under it is text in, text out -- no network, no git, no filesystem, no clock
--- and the test suite's `no_clock` fixture holds that line by making a
-`datetime` call from the library modules fail. This file is deliberately
-outside it, because `--date` has to default to today. If you find yourself
-wanting the clock, or a file, or an API call, in any other module of this
-package: it goes here instead.
+**This module is the package's I/O boundary, and the only one.** The clock is
+read here and nowhere else, and so is anything else that is not text in, text
+out: a file, a network call, git itself.
 """
 
 from __future__ import annotations
@@ -43,6 +39,10 @@ def _today() -> datetime.date:
 
     UTC rather than local time: the runner is UTC, and a release's date
     should not depend on who ran it from where.
+
+    Called where `--date` is used rather than passed as its `default=`: the
+    parser is built for every subcommand, and `bump-size` has no business
+    reading the clock to answer "minor or patch".
     """
     return datetime.datetime.now(datetime.timezone.utc).date()
 
