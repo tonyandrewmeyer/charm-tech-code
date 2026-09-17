@@ -50,7 +50,6 @@ def derive_handle(email: str) -> str | None:
 
     Returns:
         The handle without its `@`, or `None` for any other address.
-
     """
     match = NOREPLY_EMAIL_REGEX.match(email.strip())
     return match.group('handle') if match else None
@@ -73,7 +72,6 @@ def credit_for(name: str, email: str, team: Collection[str]) -> str | None:
         `@handle` when a handle can be recovered from the email, the name
         when it cannot, or `None` when this author is one of `team` and so
         is not a guest to be thanked.
-
     """
     members = normalise_team(team)
     handle = derive_handle(email)

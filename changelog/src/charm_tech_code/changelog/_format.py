@@ -75,7 +75,6 @@ def format_release_notes(categories: Mapping[str, list[Change]], compare_url: st
         compare_url: A link comparing the two ends of the range, rendered as
             the closing line. A git log does not carry one, and the tags at
             either end are the caller's to know. `None` for no closing line.
-
     """
     lines = ["## What's Changed", '']
     if categories[BREAKING]:

@@ -42,7 +42,6 @@ class Change(NamedTuple):
         credit: How to credit the author, already rendered: `@handle` where
             one is known, the person's name where it is not, and `None` for
             an author the caller named as one of its own. See `_authors`.
-
     """
 
     description: str

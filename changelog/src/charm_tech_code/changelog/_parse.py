@@ -180,7 +180,6 @@ def _cancelled(commits: list[_Commit]) -> set[int]:
 
     Returns:
         The indices into `commits` to leave out.
-
     """
     numbers = {commit.pr_number: index for index, commit in enumerate(commits) if commit.pr_number}
     cancelled: set[int] = set()
@@ -233,7 +232,6 @@ def parse_git_log(
         return value: a git log carries no compare link for the formatter to
         pass through, and inventing one would mean knowing the tags at both
         ends, which is the caller's business.
-
     """
     records = log_text.split(GIT_LOG_RECORD_SEPARATOR)
     commits: list[_Commit] = []

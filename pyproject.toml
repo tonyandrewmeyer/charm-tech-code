@@ -86,12 +86,15 @@ ignore = [
     # Magic methods and `__init__` do not need docstrings.
     "D105",
     "D107",
-    # Two pairs that selecting all of `D` turns on together and that
-    # contradict each other. Ruff resolves both on its own but warns on every
-    # run until one of each pair is named here.
-    "D203",
-    "D213",
 ]
+
+[tool.ruff.lint.pydocstyle]
+# Our docstrings are Google-style, as they are in operator, charmlibs,
+# jubilant and ops-harness, all of which say so here. Selecting all of `D`
+# without saying so leaves the rules for the other conventions turned on:
+# the contradictory `D203`/`D213` pairs, and `D413`, which wants a blank
+# line before the closing quotes of a docstring that ends in a section.
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "*/tests/*" = ["D", "S101", "S105", "S106"]
