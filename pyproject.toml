@@ -94,7 +94,7 @@ ignore = [
     "subprocess-without-shell-equals-true",  # S603
     # Magic methods and `__init__` do not need docstrings.
     "undocumented-magic-method",  # D105
-    "undocumented-public-inits",  # D107
+    "undocumented-public-init",  # D107
 ]
 
 [tool.ruff.lint.pydocstyle]
