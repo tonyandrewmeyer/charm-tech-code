@@ -95,6 +95,33 @@ PYTEST_SUMMARY_END = re.compile(
     re.VERBOSE,
 )
 
+# jubilant's `wait()` times out with the model's whole `Status(...)` as the
+# message, so pytest's summary entry for that test runs on for a hundred or
+# more lines after its first. Those lines are where the reason for the timeout
+# is -- an app stuck in error, for example -- and the summary line itself only
+# says "TimeoutError: wait timed out after 900s". These pick an app or a unit
+# out of that dump, for example "    'tempo': AppStatus(" and
+# "        'tempo/0': UnitStatus(", and then the status lines under it:
+# "      app_status=StatusInfo(current='error', message='hook failed: \"start\"', ...)".
+STATUS_ENTITY = re.compile(
+    r"""
+    ^\s*'(?P<name>[^']+)':[ ]          # the app or unit name, as a dict key
+    (?:AppStatus|UnitStatus)\(         # only apps and units, not machines or storage
+    """,
+    re.VERBOSE,
+)
+STATUS_INFO = re.compile(
+    r"""
+    ^\s*(?:app|workload|juju)_status=StatusInfo\(
+    current='(?P<current>error|blocked)'           # only the states that explain a wait
+    (?:,[ ]message=(?P<q>['"])(?P<message>.*?)(?<!\\)(?P=q))?  # repr picks either quote
+    """,
+    re.VERBOSE,
+)
+# How many of those the signature keeps. An app and its unit usually say the
+# same thing, so a stuck deployment of a few apps fits well within this.
+MAX_UNHEALTHY_STATUSES = 10
+
 # A failing Go test, for example "--- FAIL: TestFoo (0.01s)".
 GO_FAIL = re.compile(r'^--- FAIL: (\S+)')
 

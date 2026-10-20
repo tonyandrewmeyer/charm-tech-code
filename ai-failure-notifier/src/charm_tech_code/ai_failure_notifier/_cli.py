@@ -27,7 +27,7 @@ from . import _github, _openrouter, _prompt, _summary
 from ._apply import apply_entry, plain_fallback_body, render_body
 from ._candidates import build_candidates_block
 from ._constants import MARKER_PREFIX
-from ._envelope import normalise_envelope, validate_envelope
+from ._envelope import describe_envelope, normalise_envelope, validate_envelope
 from ._markers import render_enriched_marker, render_model_stamp, render_signature_stamp
 from ._models import RunSignature
 from ._signatures import build_job_signature, build_run_signature
@@ -234,6 +234,9 @@ def _fetch_envelope(
         )
         return None, None
 
+    # The body ends up on the issue, but the reasoning behind it does not, and
+    # without this there is no reading back why a run was routed where it was.
+    _summary.write_step_summary(describe_envelope(envelope))
     return envelope, answered_by
 
 

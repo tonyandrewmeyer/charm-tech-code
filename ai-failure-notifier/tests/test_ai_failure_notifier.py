@@ -313,6 +313,115 @@ class SignatureExtractionTests(unittest.TestCase):
         ])
         self.assertEqual(_signatures.strip_log(log), ['real output'])
 
+    # The shape of jubilant's wait timeout in pytest's summary, trimmed from a
+    # real scheduled "ops Integration Tests" failure (39219345374, 2026-10-19):
+    # the summary line only says the wait timed out, and the reason is further
+    # down, in the `Status(...)` that is the rest of the message.
+    WAIT_TIMEOUT_SUMMARY = (
+        '=========================== short test summary info ============================',
+        'ERROR test/integration/test_tracing.py::test_direct_connection'
+        ' - TimeoutError: wait timed out after 900s',
+        'Status(',
+        '  model=ModelStatus(',
+        "    model_status=StatusInfo(current='available', since='19 Oct 2026 08:17:13Z'),",
+        '  ),',
+        '  apps={',
+        "    'minio': AppStatus(",
+        "      app_status=StatusInfo(current='active', since='19 Oct 2026 08:16:17Z'),",
+        '      units={',
+        "        'minio/0': UnitStatus(",
+        "          workload_status=StatusInfo(current='active', since='19 Oct 2026 08:16:17Z'),",
+        "          juju_status=StatusInfo(current='idle', since='19 Oct 2026 08:02:15Z'),",
+        '        ),',
+        '      },',
+        '    ),',
+        "    'tempo': AppStatus(",
+        "      app_status=StatusInfo(current='error', message='hook failed: \"start\"',"
+        " since='19 Oct 2026 08:01:36Z'),",
+        '      units={',
+        "        'tempo/0': UnitStatus(",
+        "          workload_status=StatusInfo(current='error', message='hook failed: \"start\"',"
+        " since='19 Oct 2026 08:01:36Z'),",
+        "          juju_status=StatusInfo(current='idle', since='19 Oct 2026 08:01:49Z'),",
+        '        ),',
+        '      },',
+        '    ),',
+        "    'tempo-worker': AppStatus(",
+        "      app_status=StatusInfo(current='waiting', message='Waiting for coordinator',"
+        " since='19 Oct 2026 08:16:15Z'),",
+        '    ),',
+        '  },',
+        '  storage=CombinedStorage(',
+        "    filesystems={'0': FilesystemInfo(size=1024)},",
+        '  ),',
+        ')',
+        '======================== 1 error in 1248.60s (0:20:48) =========================',
+    )
+
+    def test_unhealthy_statuses_from_a_jubilant_wait_timeout(self):
+        statuses = _signatures.parse_unhealthy_statuses('\n'.join(self.WAIT_TIMEOUT_SUMMARY))
+        self.assertEqual(
+            statuses,
+            ['tempo: error (hook failed: "start")', 'tempo/0: error (hook failed: "start")'],
+        )
+
+    def test_unhealthy_statuses_reach_the_job_signature(self):
+        job = _signatures.build_job_signature(
+            1, 'integration', 'Run tox', '\n'.join(self.WAIT_TIMEOUT_SUMMARY)
+        )
+        self.assertEqual(job.unhealthy_statuses[0], 'tempo: error (hook failed: "start")')
+        self.assertIn(
+            'unhealthy_statuses',
+            json.loads(_signatures.build_run_signature('1', 'w', 'url', '', [job]).as_json())[
+                'jobs'
+            ][0],
+        )
+
+    def test_unhealthy_statuses_ignore_the_traceback_copy_of_the_status(self):
+        # With --tb native the same Status(...) is printed in the traceback
+        # first; only the summary's copy counts, so nothing is listed twice and
+        # a status that only the traceback has is not listed at all.
+        log = '\n'.join([
+            'Traceback (most recent call last):',
+            "    'other': AppStatus(",
+            "      app_status=StatusInfo(current='error', message='only in the traceback'),",
+            *self.WAIT_TIMEOUT_SUMMARY,
+        ])
+        self.assertEqual(
+            _signatures.parse_unhealthy_statuses(log),
+            ['tempo: error (hook failed: "start")', 'tempo/0: error (hook failed: "start")'],
+        )
+
+    def test_unhealthy_statuses_blocked_without_a_message_and_double_quoted(self):
+        log = '\n'.join([
+            'short test summary info',
+            'FAILED test/integration/test_charm.py::test_deploy - TimeoutError: wait timed out',
+            "    'db': AppStatus(",
+            "      app_status=StatusInfo(current='blocked'),",
+            "    'app': AppStatus(",
+            "      app_status=StatusInfo(current='error', message=\"can't connect\"),",
+            '======== 1 failed in 3.00s ========',
+        ])
+        self.assertEqual(
+            _signatures.parse_unhealthy_statuses(log),
+            ['db: blocked', "app: error (can't connect)"],
+        )
+
+    def test_unhealthy_statuses_are_capped(self):
+        lines = ['short test summary info', 'FAILED t.py::t - TimeoutError: wait timed out']
+        for i in range(_constants.MAX_UNHEALTHY_STATUSES + 5):
+            lines += [f"    'app{i}': AppStatus(", "      app_status=StatusInfo(current='error'),"]
+        statuses = _signatures.parse_unhealthy_statuses('\n'.join(lines))
+        self.assertEqual(len(statuses), _constants.MAX_UNHEALTHY_STATUSES)
+
+    def test_no_unhealthy_statuses_without_a_status_dump(self):
+        log = '\n'.join([
+            'short test summary info',
+            'FAILED tests/unit/test_x.py::test_a - AssertionError: x',
+            '============ 1 failed in 1.23s ============',
+        ])
+        self.assertEqual(_signatures.parse_unhealthy_statuses(log), [])
+
     def test_build_run_signature_matches_fixture_shape(self):
         jobs = [
             _signatures.build_job_signature(j.job_id, j.job_name, j.failed_step, '')
@@ -689,6 +798,36 @@ class SchemaValidationTests(unittest.TestCase):
             'confidence': 'low',
         }
         self.assertEqual(_envelope.validate_envelope(envelope), [])
+
+    def test_describe_envelope_records_the_routing_and_why(self):
+        envelope: dict[str, Any] = {
+            'action': 'new',
+            'target_issue': None,
+            'title': 'Something failed',
+            'body': 'details',
+            'labels': [],
+            'issue_type': None,
+            'dedup_reason': 'no candidate names this test',
+            'confidence': 'medium',
+            'also': [
+                {
+                    'action': 'comment',
+                    'target_issue': 44,
+                    'title': None,
+                    'labels': None,
+                    'issue_type': None,
+                    'body': 'again',
+                    'dedup_reason': '#44 names the same lint error',
+                    'confidence': 'high',
+                }
+            ],
+        }
+        self.assertEqual(
+            _envelope.describe_envelope(envelope),
+            'envelope: new on new issue, confidence medium. '
+            'Reason: no candidate names this test\n'
+            'also[0]: comment on #44, confidence high. Reason: #44 names the same lint error',
+        )
 
     def test_new_envelope_with_no_labels_is_valid(self):
         # No label is mandatory: the repo's label set is centrally managed, and

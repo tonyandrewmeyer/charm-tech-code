@@ -23,8 +23,11 @@ from ._constants import (
     GO_FAIL,
     GROUP_END,
     GROUP_RUN_START,
+    MAX_UNHEALTHY_STATUSES,
     PYTEST_SUMMARY,
     PYTEST_SUMMARY_END,
+    STATUS_ENTITY,
+    STATUS_INFO,
     TRACEBACK_END,
     TS,
 )
@@ -115,6 +118,43 @@ def parse_job_log(
     return pytest_failures, go_failures, traceback_top_error, tail
 
 
+def parse_unhealthy_statuses(text: str) -> list[str]:
+    """Find the apps and units in error or blocked in pytest's summary section.
+
+    Only the summary is read: the same `Status(...)` also appears in the
+    traceback above it, and reading both would list everything twice. Returns
+    entries like 'tempo/0: error (hook failed: "start")', in the order they
+    appear, without repeats.
+    """
+    found: list[str] = []
+    in_summary = False
+    entity: str | None = None
+    for line in strip_log(text):
+        if 'short test summary info' in line:
+            in_summary = True
+            continue
+        if not in_summary:
+            continue
+        if PYTEST_SUMMARY_END.match(line):
+            in_summary = False
+            entity = None
+            continue
+        m = STATUS_ENTITY.match(line)
+        if m:
+            entity = m.group('name')
+            continue
+        m = STATUS_INFO.match(line)
+        if m and entity is not None:
+            entry = f'{entity}: {m.group("current")}'
+            if m.group('message'):
+                entry += f' ({m.group("message")})'
+            if entry not in found:
+                found.append(entry)
+            if len(found) >= MAX_UNHEALTHY_STATUSES:
+                break
+    return found
+
+
 def build_job_signature(
     job_id: int, job_name: str, failed_step: str | None, log_text: str
 ) -> JobSignature:
@@ -128,6 +168,7 @@ def build_job_signature(
         go_failures=go_failures,
         traceback_top_error=traceback_top_error,
         tail_excerpt=tail,
+        unhealthy_statuses=parse_unhealthy_statuses(log_text),
     )
 
 

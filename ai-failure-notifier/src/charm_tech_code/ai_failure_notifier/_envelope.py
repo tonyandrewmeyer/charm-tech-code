@@ -202,3 +202,22 @@ def validate_envelope(envelope: Any) -> list[str]:
         f'{_error_path(error)}: {error.message}'
         for error in sorted(_VALIDATOR.iter_errors(envelope), key=jsonschema.exceptions.relevance)
     ]
+
+
+def describe_envelope(envelope: dict[str, Any]) -> str:
+    """Summarise a validated envelope's decision for the log, one line per entry.
+
+    The body and title end up on the issue, so they are left out. What is not
+    posted anywhere is why the model routed the failure where it did, and that
+    is what this records.
+    """
+    lines: list[str] = []
+    for label, entry in [('envelope', envelope)] + [
+        (f'also[{i}]', e) for i, e in enumerate(envelope.get('also') or [])
+    ]:
+        where = f'#{entry["target_issue"]}' if entry['action'] == 'comment' else 'new issue'
+        lines.append(
+            f'{label}: {entry["action"]} on {where}, confidence {entry["confidence"]}. '
+            f'Reason: {entry["dedup_reason"]}'
+        )
+    return '\n'.join(lines)
