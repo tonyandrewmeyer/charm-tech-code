@@ -455,6 +455,34 @@ class SignatureExtractionTests(unittest.TestCase):
         statuses = _signatures.parse_unhealthy_statuses('\n'.join(lines))
         self.assertEqual(len(statuses), _constants.MAX_UNHEALTHY_STATUSES)
 
+    def test_unhealthy_statuses_past_the_cap_keep_errors_over_blocked(self):
+        # A blocked app with many units comes first, but the app in error
+        # after it is the one worth keeping.
+        lines = ['short test summary info', 'FAILED t.py::t - TimeoutError: wait timed out']
+        lines += ["    'db': AppStatus(", "      app_status=StatusInfo(current='blocked'),"]
+        for i in range(_constants.MAX_UNHEALTHY_STATUSES):
+            lines += [
+                f"        'db/{i}': UnitStatus(",
+                f"          workload_status=StatusInfo(current='blocked', message='unit {i}'),",
+            ]
+        lines += ["    'tempo': AppStatus(", "      app_status=StatusInfo(current='error'),"]
+        statuses = _signatures.parse_unhealthy_statuses('\n'.join(lines))
+        self.assertEqual(len(statuses), _constants.MAX_UNHEALTHY_STATUSES)
+        self.assertEqual(statuses[0], 'db: blocked')
+        self.assertEqual(statuses[-1], 'tempo: error')
+
+    def test_unhealthy_statuses_include_a_status_juju_could_not_report(self):
+        # jubilant sets current='failed' when Juju reports a status-error.
+        log = '\n'.join([
+            'short test summary info',
+            'FAILED t.py::t - TimeoutError: wait timed out',
+            "    'tempo': AppStatus(",
+            "      app_status=StatusInfo(current='failed', message='cannot get status'),",
+        ])
+        self.assertEqual(
+            _signatures.parse_unhealthy_statuses(log), ['tempo: failed (cannot get status)']
+        )
+
     def test_no_unhealthy_statuses_without_a_status_dump(self):
         log = '\n'.join([
             'short test summary info',

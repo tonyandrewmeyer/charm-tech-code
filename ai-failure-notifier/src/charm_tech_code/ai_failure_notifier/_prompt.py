@@ -75,7 +75,7 @@ carry, in decreasing order of how much you should trust it:
    ever stating what actually broke. Do not guess a specific root cause
    from an inconclusive `tail_excerpt`. It is fine, and preferred, to say
    plainly that the cause isn't visible in the available log excerpt.
-4. `unhealthy_statuses[]` -- apps and units that were in `error` or
+4. `unhealthy_statuses[]` -- apps and units that were in `error`, `failed` or
    `blocked` when a Juju wait in the tests timed out, read from the model
    status the test framework printed with the timeout, for example
    `tempo/0: error (hook failed: "start")`. When a test failed with a wait
@@ -83,7 +83,9 @@ carry, in decreasing order of how much you should trust it:
    likely root cause: the wait timed out because that app was in error.
    Say which app, and quote its status message, in the `Likely root cause`
    section and in the title if it fits. The status says which hook failed,
-   not why: do not guess at what went wrong inside the hook. A `blocked`
+   not why: do not guess at what went wrong inside the hook. `failed` means
+   Juju couldn't report that app or unit's status at all; treat it like
+   `error`, but don't guess why the status couldn't be read. A `blocked`
    entry alone is weaker evidence, since some apps are expected to be
    blocked while others are still settling; mention it, but don't call it
    the cause unless nothing else is in `error`. An empty list says nothing

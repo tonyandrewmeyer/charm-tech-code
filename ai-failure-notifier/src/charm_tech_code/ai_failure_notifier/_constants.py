@@ -126,13 +126,14 @@ STATUS_INFO = re.compile(
 STATUS_INFO_END = re.compile(r'^\s*\),?\s*$')
 STATUS_FIELDS = re.compile(
     r"""
-    current='(?P<current>error|blocked)'           # only the states that explain a wait
+    current='(?P<current>error|failed|blocked)'    # only the states that explain a wait
     (?:,[ ]message=(?P<q>['"])(?P<message>.*?)(?<!\\)(?P=q))?  # repr picks either quote
     """,
     re.VERBOSE,
 )
 # How many of those the signature keeps. An app and its unit usually say the
-# same thing, so a stuck deployment of a few apps fits well within this.
+# same thing, so a stuck deployment of a few apps fits well within this. When
+# there are more, error and failed ones are kept ahead of blocked ones.
 MAX_UNHEALTHY_STATUSES = 10
 
 # A failing Go test, for example "--- FAIL: TestFoo (0.01s)".

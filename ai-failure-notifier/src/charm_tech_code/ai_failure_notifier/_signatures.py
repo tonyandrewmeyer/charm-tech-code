@@ -65,15 +65,15 @@ def strip_log(text: str) -> list[str]:
 
 
 class _StatusCollector:
-    """Pick the apps and units in error or blocked out of a `Status(...)` dump.
+    """Pick the apps and units in error, failed or blocked out of a `Status(...)` dump.
 
-    Fed one line at a time from pytest's summary section. `found` holds
+    Fed one line at a time from pytest's summary section. `found()` returns
     entries like 'tempo/0: error (hook failed: "start")', in the order they
     appear, without repeats.
     """
 
     def __init__(self) -> None:
-        self.found: list[str] = []
+        self._found: list[tuple[str, str]] = []  # (current, entry)
         self._entity: str | None = None
         # The field lines of a StatusInfo that jubilant split over several lines.
         self._split_fields: list[str] | None = None
@@ -102,13 +102,21 @@ class _StatusCollector:
                 self._split_fields = []
                 return
         m = STATUS_FIELDS.match(fields)
-        if not m or len(self.found) >= MAX_UNHEALTHY_STATUSES:
+        if not m:
             return
-        entry = f'{self._entity}: {m.group("current")}'
+        current = m.group('current')
+        entry = f'{self._entity}: {current}'
         if m.group('message'):
             entry += f' ({m.group("message")})'
-        if entry not in self.found:
-            self.found.append(entry)
+        if (current, entry) not in self._found:
+            self._found.append((current, entry))
+
+    def found(self) -> list[str]:
+        # Past the cap, drop blocked entries first: error and failed are the
+        # stronger evidence, and one app with many units shouldn't hide them.
+        kept = [i for i, (current, _) in enumerate(self._found) if current != 'blocked']
+        kept += [i for i, (current, _) in enumerate(self._found) if current == 'blocked']
+        return [self._found[i][1] for i in sorted(kept[:MAX_UNHEALTHY_STATUSES])]
 
 
 def parse_job_log(
@@ -173,11 +181,11 @@ def parse_job_log(
                 break
         tail.reverse()
 
-    return pytest_failures, go_failures, traceback_top_error, tail, statuses.found
+    return pytest_failures, go_failures, traceback_top_error, tail, statuses.found()
 
 
 def parse_unhealthy_statuses(text: str) -> list[str]:
-    """Find the apps and units in error or blocked in pytest's summary section."""
+    """Find the apps and units in error, failed or blocked in pytest's summary section."""
     return parse_job_log(text)[4]
 
 

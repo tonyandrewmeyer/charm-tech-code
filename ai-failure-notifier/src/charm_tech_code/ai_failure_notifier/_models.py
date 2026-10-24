@@ -50,7 +50,7 @@ class JobSignature:
     go_failures: list[str]
     traceback_top_error: str | None
     tail_excerpt: list[str]
-    # Apps and units in error or blocked, from the `Status(...)` a jubilant
+    # Apps and units in error, failed or blocked, from the `Status(...)` a jubilant
     # wait timeout prints in pytest's summary, for example
     # 'tempo: error (hook failed: "start")'. Defaulted so that a caller built
     # before the field existed still builds.
