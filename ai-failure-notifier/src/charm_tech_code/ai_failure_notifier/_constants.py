@@ -99,7 +99,10 @@ PYTEST_SUMMARY_END = re.compile(
 # message, so pytest's summary entry for that test runs on for a hundred or
 # more lines after its first. Those lines are where the reason for the timeout
 # is -- an app stuck in error, for example -- and the summary line itself only
-# says "TimeoutError: wait timed out after 900s". These pick an app or a unit
+# says "TimeoutError: wait timed out after 900s". pytest only keeps the whole
+# message on a summary line when it detects CI (or with -vv), and never with
+# --force-short-summary; otherwise the line is trimmed to the terminal width
+# and there is no dump to read. These pick an app or a unit
 # out of that dump, for example "    'tempo': AppStatus(" and
 # "        'tempo/0': UnitStatus(", and then the status lines under it:
 # "      app_status=StatusInfo(current='error', message='hook failed: \"start\"', ...)".
