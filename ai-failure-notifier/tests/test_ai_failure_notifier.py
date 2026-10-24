@@ -223,7 +223,7 @@ class SignatureExtractionTests(unittest.TestCase):
             f'{ts}============ 2 failed in 1.23s ============',
             f'{ts}some trailing noise, not part of the summary',
         ])
-        pytest_failures, go_failures, _tb, _tail = _signatures.parse_job_log(log)
+        pytest_failures, go_failures, _tb, _tail, _statuses = _signatures.parse_job_log(log)
         self.assertEqual(
             pytest_failures,
             [
@@ -239,7 +239,7 @@ class SignatureExtractionTests(unittest.TestCase):
 
     def test_parse_job_log_go_failures(self):
         log = '--- FAIL: TestFoo (0.03s)\n--- FAIL: TestBar (0.01s)\n'
-        _pytest_failures, go_failures, _tb, _tail = _signatures.parse_job_log(log)
+        _pytest_failures, go_failures, _tb, _tail, _statuses = _signatures.parse_job_log(log)
         self.assertEqual(go_failures, ['TestFoo', 'TestBar'])
 
     def test_parse_job_log_traceback_top_error_prefers_last_match(self):
@@ -248,7 +248,7 @@ class SignatureExtractionTests(unittest.TestCase):
             'some other output',
             'AttributeError: the real one',
         ])
-        _, _, tb, _ = _signatures.parse_job_log(log)
+        _, _, tb, _, _ = _signatures.parse_job_log(log)
         self.assertEqual(tb, 'AttributeError: the real one')
 
     def test_parse_job_log_tail_excerpt_stops_before_first_error_marker(self):
@@ -258,7 +258,7 @@ class SignatureExtractionTests(unittest.TestCase):
             '##[error]something broke',
             'line after (should not appear in tail)',
         ])
-        _, _, _, tail = _signatures.parse_job_log(log)
+        _, _, _, tail, _ = _signatures.parse_job_log(log)
         self.assertEqual(tail, ['line before 1', 'line before 2'])
 
     def test_parse_job_log_ignores_the_step_script_the_runner_echoes(self):
@@ -275,7 +275,7 @@ class SignatureExtractionTests(unittest.TestCase):
             'short test summary info',
             "FAILED test/test_model.py::TestModel::test_thing - KeyError: 'host'",
         ])
-        pytest_failures, _go, tb, _tail = _signatures.parse_job_log(log)
+        pytest_failures, _go, tb, _tail, _statuses = _signatures.parse_job_log(log)
         self.assertIsNone(tb)
         self.assertEqual([f.error for f in pytest_failures], ["KeyError: 'host'"])
 
@@ -289,7 +289,7 @@ class SignatureExtractionTests(unittest.TestCase):
             'short test summary info',
             'FAILED test/test_model.py::TestModel::test_thing - KeyError',
         ])
-        pytest_failures, _go, _tb, _tail = _signatures.parse_job_log(log)
+        pytest_failures, _go, _tb, _tail, _statuses = _signatures.parse_job_log(log)
         self.assertEqual(len(pytest_failures), 1)
 
     def test_parse_job_log_keeps_groups_the_step_itself_opened(self):
@@ -300,7 +300,7 @@ class SignatureExtractionTests(unittest.TestCase):
             'AttributeError: this is real output',
             '##[endgroup]',
         ])
-        _, _, tb, _ = _signatures.parse_job_log(log)
+        _, _, tb, _, _ = _signatures.parse_job_log(log)
         self.assertEqual(tb, 'AttributeError: this is real output')
 
     def test_strip_log_drops_the_env_dump_with_the_script(self):
