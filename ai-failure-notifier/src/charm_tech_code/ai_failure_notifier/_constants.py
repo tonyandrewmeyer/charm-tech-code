@@ -103,6 +103,9 @@ PYTEST_SUMMARY_END = re.compile(
 # out of that dump, for example "    'tempo': AppStatus(" and
 # "        'tempo/0': UnitStatus(", and then the status lines under it:
 # "      app_status=StatusInfo(current='error', message='hook failed: \"start\"', ...)".
+# jubilant only prints a StatusInfo on one line while it fits in 150
+# characters. A longer one, usually a charm's own blocked message, has the
+# opener on a line by itself, then one field per line, then "),".
 STATUS_ENTITY = re.compile(
     r"""
     ^\s*'(?P<name>[^']+)':[ ]          # the app or unit name, as a dict key
@@ -113,6 +116,13 @@ STATUS_ENTITY = re.compile(
 STATUS_INFO = re.compile(
     r"""
     ^\s*(?:app|workload|juju)_status=StatusInfo\(
+    (?P<fields>.*)                     # empty when the fields are on the lines below
+    """,
+    re.VERBOSE,
+)
+STATUS_INFO_END = re.compile(r'^\s*\),?\s*$')
+STATUS_FIELDS = re.compile(
+    r"""
     current='(?P<current>error|blocked)'           # only the states that explain a wait
     (?:,[ ]message=(?P<q>['"])(?P<message>.*?)(?<!\\)(?P=q))?  # repr picks either quote
     """,

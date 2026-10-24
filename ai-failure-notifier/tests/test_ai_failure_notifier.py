@@ -407,6 +407,47 @@ class SignatureExtractionTests(unittest.TestCase):
             ['db: blocked', "app: error (can't connect)"],
         )
 
+    def test_unhealthy_statuses_split_over_several_lines(self):
+        # jubilant prints a StatusInfo one field per line once it doesn't fit
+        # on one. The 'db' app is jubilant's own output for this message.
+        message = (
+            'Waiting for the database relation to provide credentials;'
+            ' see juju debug-log for details'
+        )
+        log = '\n'.join([
+            'short test summary info',
+            'FAILED test/integration/test_charm.py::test_deploy - TimeoutError: wait timed out',
+            "    'db': AppStatus(",
+            "      charm='db',",
+            '      app_status=StatusInfo(',
+            "        current='blocked',",
+            f"        message='{message}',",
+            "        since='19 Oct 2026 08:01:36Z',",
+            '      ),',
+            '      units={',
+            "        'db/0': UnitStatus(",
+            '          workload_status=StatusInfo(',
+            "            current='blocked',",
+            f"            message='{message}',",
+            "            since='19 Oct 2026 08:01:36Z',",
+            '          ),',
+            "          juju_status=StatusInfo(current='idle', since='19 Oct 2026 08:01:36Z'),",
+            '        ),',
+            '      },',
+            '    ),',
+            "    'app': AppStatus(",
+            "      app_status=StatusInfo(current='error', message='hook failed: \"start\"'),",
+            '======== 1 failed in 3.00s ========',
+        ])
+        self.assertEqual(
+            _signatures.parse_unhealthy_statuses(log),
+            [
+                f'db: blocked ({message})',
+                f'db/0: blocked ({message})',
+                'app: error (hook failed: "start")',
+            ],
+        )
+
     def test_unhealthy_statuses_are_capped(self):
         lines = ['short test summary info', 'FAILED t.py::t - TimeoutError: wait timed out']
         for i in range(_constants.MAX_UNHEALTHY_STATUSES + 5):

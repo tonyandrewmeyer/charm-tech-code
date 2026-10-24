@@ -27,7 +27,9 @@ from ._constants import (
     PYTEST_SUMMARY,
     PYTEST_SUMMARY_END,
     STATUS_ENTITY,
+    STATUS_FIELDS,
     STATUS_INFO,
+    STATUS_INFO_END,
     TRACEBACK_END,
     TS,
 )
@@ -129,6 +131,8 @@ def parse_unhealthy_statuses(text: str) -> list[str]:
     found: list[str] = []
     in_summary = False
     entity: str | None = None
+    # The field lines of a StatusInfo that jubilant split over several lines.
+    split_fields: list[str] | None = None
     for line in strip_log(text):
         if 'short test summary info' in line:
             in_summary = True
@@ -138,13 +142,28 @@ def parse_unhealthy_statuses(text: str) -> list[str]:
         if PYTEST_SUMMARY_END.match(line):
             in_summary = False
             entity = None
+            split_fields = None
             continue
-        m = STATUS_ENTITY.match(line)
+        if split_fields is not None:
+            if not STATUS_INFO_END.match(line):
+                split_fields.append(line.strip())
+                continue
+            fields = ' '.join(split_fields)
+            split_fields = None
+        else:
+            m = STATUS_ENTITY.match(line)
+            if m:
+                entity = m.group('name')
+                continue
+            m = STATUS_INFO.match(line)
+            if not m or entity is None:
+                continue
+            fields = m.group('fields')
+            if not fields:
+                split_fields = []
+                continue
+        m = STATUS_FIELDS.match(fields)
         if m:
-            entity = m.group('name')
-            continue
-        m = STATUS_INFO.match(line)
-        if m and entity is not None:
             entry = f'{entity}: {m.group("current")}'
             if m.group('message'):
                 entry += f' ({m.group("message")})'
